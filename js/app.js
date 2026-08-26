@@ -7,10 +7,12 @@ const state = {
   cotisations: [],
   deces: [],
   depenses: [],
+  documents: [],
+  archives: { headers: [], rows: [] },
+  archivesFilters: {},
   selectedId: null,
   editingCotisationId: null,
-  editingDecesId: null,
-  editingDepenseId: null
+  currentView: 'adherents'
 };
 
 const STATUT_LABELS = {
@@ -63,11 +65,13 @@ function adherentName(a) {
 
 async function loadAll(preserveSelection) {
   try {
-    const { adherents, cotisations, deces, depenses } = await Api.getAll();
+    const { adherents, cotisations, deces, depenses, documents, archives } = await Api.getAll();
     state.adherents = adherents;
     state.cotisations = cotisations;
     state.deces = deces || [];
     state.depenses = depenses || [];
+    state.documents = documents || [];
+    state.archives = archives || { headers: [], rows: [] };
     if (!preserveSelection || !adherents.find(a => a.ID === state.selectedId)) {
       state.selectedId = preserveSelection ? state.selectedId : null;
     }
@@ -77,6 +81,9 @@ async function loadAll(preserveSelection) {
     renderDetails();
     renderDeces();
     renderDepenses();
+    renderRapports();
+    renderDocuments();
+    renderArchives();
   } catch (err) {
     showToast('Erreur de chargement : ' + err.message, true);
   }
@@ -84,6 +91,36 @@ async function loadAll(preserveSelection) {
 
 function renderDemoBadge() {
   $('demo-badge').classList.toggle('hidden', !Api.isDemoMode());
+}
+
+/* ---------------------------------------------------------------------- */
+/* Menu de navigation / vues                                               */
+/* ---------------------------------------------------------------------- */
+
+function showView(viewName) {
+  document.querySelectorAll('.view').forEach(v => v.classList.add('hidden'));
+  const target = $('view-' + viewName);
+  if (target) target.classList.remove('hidden');
+  document.querySelectorAll('.menu-item[data-view]').forEach(btn => {
+    btn.classList.toggle('active', btn.dataset.view === viewName);
+  });
+  state.currentView = viewName;
+  closeMainMenu();
+}
+
+function openMainMenu() {
+  $('main-menu').classList.remove('hidden');
+  $('btn-menu').setAttribute('aria-expanded', 'true');
+}
+
+function closeMainMenu() {
+  $('main-menu').classList.add('hidden');
+  $('btn-menu').setAttribute('aria-expanded', 'false');
+}
+
+function toggleMainMenu() {
+  if ($('main-menu').classList.contains('hidden')) openMainMenu();
+  else closeMainMenu();
 }
 
 /* ---------------------------------------------------------------------- */
@@ -485,6 +522,368 @@ async function handleDepenseSubmit(evt) {
 }
 
 /* ---------------------------------------------------------------------- */
+/* Export CSV                                                              */
+/* ---------------------------------------------------------------------- */
+
+function csvEscape(val) {
+  const s = String(val === null || val === undefined ? '' : val);
+  if (/[",;\n]/.test(s)) return '"' + s.replace(/"/g, '""') + '"';
+  return s;
+}
+
+function downloadCsv(filename, rows) {
+  const csv = rows.map(r => r.map(csvEscape).join(';')).join('\r\n');
+  const blob = new Blob(['﻿' + csv], { type: 'text/csv;charset=utf-8;' });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement('a');
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Rapports                                                                 */
+/* ---------------------------------------------------------------------- */
+
+function computeBilanByYear() {
+  const map = {};
+  function ensure(y) {
+    if (!map[y]) map[y] = { recettes: 0, depenses: 0 };
+    return map[y];
+  }
+  for (const c of state.cotisations) {
+    ensure(yearOf(c.Date) || '—').recettes += Number(c.Montant || 0);
+  }
+  for (const d of state.depenses) {
+    ensure(yearOf(d.Date) || '—').depenses += Number(d.Montant || 0);
+  }
+  for (const d of state.deces) {
+    ensure(yearOf(d.Date) || '—').depenses += Number(d.CoutFuneraire || 0);
+  }
+  return map;
+}
+
+function getCotisationsRapportRows() {
+  return state.cotisations
+    .map(c => {
+      const a = state.adherents.find(a => a.ID === c.AdherentID);
+      return {
+        nom: a ? a.Nom : '',
+        prenom: a ? a.Prenom : '',
+        date: c.Date,
+        montant: c.Montant,
+        statut: c.Statut
+      };
+    })
+    .sort((x, y) => {
+      const n = `${x.nom} ${x.prenom}`.localeCompare(`${y.nom} ${y.prenom}`, 'fr');
+      if (n !== 0) return n;
+      return (y.date || '').localeCompare(x.date || '');
+    });
+}
+
+function renderRapports() {
+  const map = computeBilanByYear();
+  const years = Object.keys(map).sort((a, b) => b.localeCompare(a));
+
+  const tbody = $('bilan-tbody');
+  tbody.innerHTML = '';
+  let totalRecettes = 0, totalDepenses = 0;
+  for (const y of years) {
+    const { recettes, depenses } = map[y];
+    const solde = recettes - depenses;
+    totalRecettes += recettes;
+    totalDepenses += depenses;
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(y)}</td>
+      <td>${formatMontant(recettes)}</td>
+      <td>${formatMontant(depenses)}</td>
+      <td class="${solde < 0 ? 'solde-negatif' : 'solde-positif'}">${formatMontant(solde)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  $('bilan-total-recettes').textContent = formatMontant(totalRecettes);
+  $('bilan-total-depenses').textContent = formatMontant(totalDepenses);
+  $('bilan-total-solde').textContent = formatMontant(totalRecettes - totalDepenses);
+  $('empty-bilan').classList.toggle('hidden', years.length !== 0);
+
+  const rows = getCotisationsRapportRows();
+  const rtbody = $('rapport-cotisations-tbody');
+  rtbody.innerHTML = '';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(r.nom)}</td>
+      <td>${escapeHtml(r.prenom)}</td>
+      <td>${escapeHtml(formatDate(r.date))}</td>
+      <td>${formatMontant(r.montant)}</td>
+      <td>${escapeHtml(STATUT_LABELS[r.statut] || r.statut || '')}</td>
+    `;
+    rtbody.appendChild(tr);
+  }
+  $('empty-rapport-cotisations').classList.toggle('hidden', rows.length !== 0);
+}
+
+function exportBilanCsv() {
+  const map = computeBilanByYear();
+  const years = Object.keys(map).sort((a, b) => a.localeCompare(b));
+  const rows = [['Année', 'Recettes', 'Dépenses', 'Solde']];
+  for (const y of years) {
+    const { recettes, depenses } = map[y];
+    rows.push([y, recettes.toFixed(2), depenses.toFixed(2), (recettes - depenses).toFixed(2)]);
+  }
+  downloadCsv('bilan-financier.csv', rows);
+}
+
+function exportCotisationsCsv() {
+  const rows = [['Nom', 'Prénom', 'Date', 'Montant', 'Statut']];
+  for (const r of getCotisationsRapportRows()) {
+    rows.push([r.nom, r.prenom, r.date || '', Number(r.montant || 0).toFixed(2), STATUT_LABELS[r.statut] || r.statut || '']);
+  }
+  downloadCsv('cotisations-par-adherent.csv', rows);
+}
+
+/* ---------------------------------------------------------------------- */
+/* Documents                                                                */
+/* ---------------------------------------------------------------------- */
+
+function renderDocuments() {
+  const list = state.documents.slice().sort((a, b) => (b.Date || '').localeCompare(a.Date || ''));
+  const tbody = $('documents-tbody');
+  tbody.innerHTML = '';
+  for (const d of list) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(d.Nom || '')}</td>
+      <td>${escapeHtml(d.Description || '')}</td>
+      <td>${escapeHtml(formatDate(d.Date))}</td>
+      <td>${pjCellHtml(d.PieceJointeUrl, d.PieceJointeNom)}</td>
+      <td class="row-actions"></td>
+    `;
+    const actionsTd = tr.querySelector('.row-actions');
+
+    const editBtn = document.createElement('button');
+    editBtn.textContent = 'Modifier';
+    editBtn.className = 'btn btn-secondary btn-sm';
+    editBtn.addEventListener('click', () => openDocumentModal(d));
+
+    const delBtn = document.createElement('button');
+    delBtn.textContent = 'Supprimer';
+    delBtn.className = 'btn btn-danger btn-sm';
+    delBtn.addEventListener('click', () => {
+      openConfirmModal(`Supprimer le document « ${d.Nom} » ?`, async () => {
+        try {
+          await Api.deleteDocument(d.ID);
+          showToast('Document supprimé.');
+          await loadAll(true);
+        } catch (err) {
+          showToast('Erreur : ' + err.message, true);
+        }
+      });
+    });
+
+    actionsTd.appendChild(editBtn);
+    actionsTd.appendChild(delBtn);
+    tbody.appendChild(tr);
+  }
+  $('empty-documents').classList.toggle('hidden', list.length !== 0);
+
+  renderPjAggregate();
+}
+
+function renderPjAggregate() {
+  const rows = [];
+  for (const d of state.deces) {
+    if (d.PieceJointeUrl) {
+      rows.push({ origine: 'Décès', libelle: `${d.Nom || ''} ${d.Prenom || ''}`.trim(), date: d.Date, url: d.PieceJointeUrl, nom: d.PieceJointeNom });
+    }
+  }
+  for (const d of state.depenses) {
+    if (d.PieceJointeUrl) {
+      rows.push({ origine: 'Dépense', libelle: d.Nature || '', date: d.Date, url: d.PieceJointeUrl, nom: d.PieceJointeNom });
+    }
+  }
+  rows.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const tbody = $('pj-aggregate-tbody');
+  tbody.innerHTML = '';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(r.origine)}</td>
+      <td>${escapeHtml(r.libelle)}</td>
+      <td>${escapeHtml(formatDate(r.date))}</td>
+      <td>${pjCellHtml(r.url, r.nom)}</td>
+    `;
+    tbody.appendChild(tr);
+  }
+  $('empty-pj-aggregate').classList.toggle('hidden', rows.length !== 0);
+}
+
+function openDocumentModal(record) {
+  $('document-form').reset();
+  $('doc-fichier-actuel').classList.add('hidden');
+  if (record) {
+    $('document-modal-title').textContent = 'Modifier le document';
+    $('doc-id').value = record.ID;
+    $('doc-nom').value = record.Nom || '';
+    $('doc-description').value = record.Description || '';
+    $('doc-date').value = record.Date || '';
+    if (record.PieceJointeUrl) {
+      $('doc-fichier-actuel').textContent = 'Fichier actuel : ' + (record.PieceJointeNom || 'fichier') + ' (laisser vide pour le conserver)';
+      $('doc-fichier-actuel').classList.remove('hidden');
+    }
+  } else {
+    $('document-modal-title').textContent = 'Ajouter un document';
+    $('doc-id').value = '';
+  }
+  $('document-modal').classList.remove('hidden');
+  $('doc-nom').focus();
+}
+
+function closeDocumentModal() {
+  $('document-modal').classList.add('hidden');
+}
+
+async function handleDocumentSubmit(evt) {
+  evt.preventDefault();
+  const id = $('doc-id').value;
+  try {
+    const pieceJointe = await fileInputToPieceJointe($('doc-fichier'));
+    const existing = id ? state.documents.find(d => d.ID === id) : null;
+    const data = {
+      nom: $('doc-nom').value.trim(),
+      description: $('doc-description').value.trim(),
+      date: $('doc-date').value,
+      pieceJointe: pieceJointe,
+      pieceJointeUrl: existing ? existing.PieceJointeUrl : '',
+      pieceJointeNom: existing ? existing.PieceJointeNom : ''
+    };
+    if (id) {
+      data.id = id;
+      await Api.updateDocument(data);
+      showToast('Document modifié.');
+    } else {
+      await Api.createDocument(data);
+      showToast('Document ajouté.');
+    }
+    closeDocumentModal();
+    await loadAll(true);
+  } catch (err) {
+    showToast('Erreur : ' + err.message, true);
+  }
+}
+
+/* ---------------------------------------------------------------------- */
+/* Archives (lecture seule, onglet Google Sheet dédié)                     */
+/* ---------------------------------------------------------------------- */
+
+const ARCHIVES_MAX_DISTINCT_VALUES = 40;
+
+function archivesFilterableColumns() {
+  const headers = state.archives.headers || [];
+  const rows = state.archives.rows || [];
+  return headers.filter(h => {
+    const distinct = new Set(rows.map(r => String(r[h] === undefined || r[h] === null ? '' : r[h]).trim()).filter(v => v !== ''));
+    return distinct.size > 0 && distinct.size <= ARCHIVES_MAX_DISTINCT_VALUES;
+  });
+}
+
+function renderArchivesTableHead() {
+  const headers = state.archives.headers || [];
+  const tr = $('archives-thead-row');
+  tr.innerHTML = headers.map(h => `<th>${escapeHtml(h)}</th>`).join('');
+}
+
+function renderArchivesFilters() {
+  const container = $('archives-filters');
+  container.innerHTML = '';
+  const rows = state.archives.rows || [];
+  const cols = archivesFilterableColumns();
+
+  // Nettoyer les filtres actifs sur des colonnes qui n'existent plus / ne sont plus filtrables
+  Object.keys(state.archivesFilters).forEach(k => {
+    if (!cols.includes(k)) delete state.archivesFilters[k];
+  });
+
+  for (const col of cols) {
+    const values = Array.from(new Set(rows.map(r => String(r[col] === undefined || r[col] === null ? '' : r[col]).trim()).filter(v => v !== '')))
+      .sort((a, b) => a.localeCompare(b, 'fr'));
+
+    const wrap = document.createElement('label');
+    wrap.className = 'archives-filter';
+    wrap.textContent = col;
+
+    const select = document.createElement('select');
+    select.dataset.column = col;
+    const optAll = document.createElement('option');
+    optAll.value = '';
+    optAll.textContent = 'Tous';
+    select.appendChild(optAll);
+    for (const v of values) {
+      const opt = document.createElement('option');
+      opt.value = v;
+      opt.textContent = v;
+      select.appendChild(opt);
+    }
+    select.value = state.archivesFilters[col] || '';
+    select.addEventListener('change', () => {
+      if (select.value) state.archivesFilters[col] = select.value;
+      else delete state.archivesFilters[col];
+      renderArchivesRows();
+    });
+
+    wrap.appendChild(select);
+    container.appendChild(wrap);
+  }
+}
+
+function filteredArchivesRows() {
+  const headers = state.archives.headers || [];
+  const rows = state.archives.rows || [];
+  const q = ($('archives-search') ? $('archives-search').value.trim().toLowerCase() : '');
+
+  return rows.filter(r => {
+    for (const col of Object.keys(state.archivesFilters)) {
+      const wanted = state.archivesFilters[col];
+      const val = String(r[col] === undefined || r[col] === null ? '' : r[col]).trim();
+      if (val !== wanted) return false;
+    }
+    if (!q) return true;
+    return headers.some(h => String(r[h] === undefined || r[h] === null ? '' : r[h]).toLowerCase().includes(q));
+  });
+}
+
+function renderArchivesRows() {
+  const headers = state.archives.headers || [];
+  const rows = filteredArchivesRows();
+  const tbody = $('archives-tbody');
+  tbody.innerHTML = '';
+  for (const r of rows) {
+    const tr = document.createElement('tr');
+    tr.innerHTML = headers.map(h => `<td>${escapeHtml(r[h] === undefined || r[h] === null ? '' : String(r[h]))}</td>`).join('');
+    tbody.appendChild(tr);
+  }
+  $('empty-archives').classList.toggle('hidden', rows.length !== 0);
+}
+
+function renderArchives() {
+  const headers = state.archives.headers || [];
+  const notConfigured = headers.length === 0;
+  $('archives-not-configured').classList.toggle('hidden', !notConfigured);
+  $('archives-content').classList.toggle('hidden', notConfigured);
+  if (notConfigured) return;
+
+  renderArchivesTableHead();
+  renderArchivesFilters();
+  renderArchivesRows();
+}
+
+/* ---------------------------------------------------------------------- */
 /* Modale adhérent (Nouveau / Modifier)                                    */
 /* ---------------------------------------------------------------------- */
 
@@ -647,7 +1046,6 @@ function init() {
   });
   $('confirm-no').addEventListener('click', closeConfirmModal);
 
-  $('btn-settings').addEventListener('click', openSettingsModal);
   $('settings-save').addEventListener('click', handleSettingsSave);
   $('settings-cancel').addEventListener('click', closeSettingsModal);
 
@@ -661,6 +1059,33 @@ function init() {
   $('btn-new-depense').addEventListener('click', () => openDepenseModal(null));
   $('depense-form').addEventListener('submit', handleDepenseSubmit);
   $('depense-modal-cancel').addEventListener('click', closeDepenseModal);
+
+  $('btn-new-document').addEventListener('click', () => openDocumentModal(null));
+  $('document-form').addEventListener('submit', handleDocumentSubmit);
+  $('document-modal-cancel').addEventListener('click', closeDocumentModal);
+
+  $('archives-search').addEventListener('input', renderArchivesRows);
+
+  $('btn-export-bilan').addEventListener('click', exportBilanCsv);
+  $('btn-export-cotisations').addEventListener('click', exportCotisationsCsv);
+  $('btn-print-rapports').addEventListener('click', () => window.print());
+
+  $('btn-menu').addEventListener('click', (evt) => {
+    evt.stopPropagation();
+    toggleMainMenu();
+  });
+  document.querySelectorAll('.menu-item[data-view]').forEach(btn => {
+    btn.addEventListener('click', () => showView(btn.dataset.view));
+  });
+  $('menu-configuration').addEventListener('click', () => {
+    closeMainMenu();
+    openSettingsModal();
+  });
+  document.addEventListener('click', (evt) => {
+    if (!$('main-menu').classList.contains('hidden') && !evt.target.closest('.menu-wrap')) {
+      closeMainMenu();
+    }
+  });
 
   loadAll(false);
 }

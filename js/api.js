@@ -49,6 +49,16 @@ const Api = (() => {
   ];
   const demoDeces = [];
   const demoDepenses = [];
+  const demoDocuments = [];
+
+  // Archives : lecture seule, en principe alimentée directement dans Google Sheets.
+  // Ces exemples permettent de tester la page en mode démo.
+  const demoArchivesHeaders = ['Référence', 'Nom', 'Prénom', 'Catégorie', 'Année'];
+  const demoArchivesRows = [
+    { 'Référence': 'ARC-001', 'Nom': 'Diop', 'Prénom': 'Awa', 'Catégorie': 'Adhésion', 'Année': '2022' },
+    { 'Référence': 'ARC-002', 'Nom': 'Fall', 'Prénom': 'Moussa', 'Catégorie': 'Cotisation', 'Année': '2023' },
+    { 'Référence': 'ARC-003', 'Nom': 'Sow', 'Prénom': 'Fatou', 'Catégorie': 'Décès', 'Année': '2024' }
+  ];
 
   // En mode démo, une pièce jointe est simplement gardée sous forme de data URL
   // (rien n'est envoyé nulle part) : cela permet quand même de l'ouvrir/visualiser.
@@ -75,7 +85,9 @@ const Api = (() => {
       adherents: json.adherents,
       cotisations: json.cotisations,
       deces: json.deces || [],
-      depenses: json.depenses || []
+      depenses: json.depenses || [],
+      documents: json.documents || [],
+      archives: json.archives || { headers: [], rows: [] }
     };
   }
 
@@ -104,7 +116,9 @@ const Api = (() => {
         adherents: demoAdherents.slice(),
         cotisations: demoCotisations.slice(),
         deces: demoDeces.slice(),
-        depenses: demoDepenses.slice()
+        depenses: demoDepenses.slice(),
+        documents: demoDocuments.slice(),
+        archives: { headers: demoArchivesHeaders.slice(), rows: demoArchivesRows.slice() }
       };
     }
     return remoteGetAll();
@@ -252,11 +266,47 @@ const Api = (() => {
     return remotePost('deleteDepense', { id });
   }
 
+  async function createDocument(data) {
+    if (isDemoMode()) {
+      const pj = pieceJointeToDemoRecord(data.pieceJointe);
+      const rec = {
+        ID: uid(), Nom: data.nom, Description: data.description || '',
+        Date: data.date || '', PieceJointeUrl: pj.url, PieceJointeNom: pj.nom
+      };
+      demoDocuments.push(rec);
+      return rec;
+    }
+    return remotePost('createDocument', data);
+  }
+
+  async function updateDocument(data) {
+    if (isDemoMode()) {
+      const rec = demoDocuments.find(d => d.ID === data.id);
+      if (rec) {
+        const pj = pieceJointeToDemoRecord(data.pieceJointe, rec.PieceJointeUrl, rec.PieceJointeNom);
+        rec.Nom = data.nom; rec.Description = data.description || ''; rec.Date = data.date || '';
+        rec.PieceJointeUrl = pj.url; rec.PieceJointeNom = pj.nom;
+      }
+      return rec;
+    }
+    return remotePost('updateDocument', data);
+  }
+
+  async function deleteDocument(id) {
+    if (isDemoMode()) {
+      const idx = demoDocuments.findIndex(d => d.ID === id);
+      if (idx !== -1) demoDocuments.splice(idx, 1);
+      return { id };
+    }
+    return remotePost('deleteDocument', { id });
+  }
+
   return {
     getApiUrl, setApiUrl, isDemoMode, getAll,
     createAdherent, updateAdherent, deleteAdherent,
     createCotisation, updateCotisation, deleteCotisation,
     createDeces, updateDeces, deleteDeces,
-    createDepense, updateDepense, deleteDepense
+    createDepense, updateDepense, deleteDepense,
+    createDocument, updateDocument, deleteDocument
   };
 })();
