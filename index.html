@@ -12,166 +12,309 @@
   <h1>Caisse — Gestion des adhérents</h1>
   <div class="topbar-actions">
     <span id="demo-badge" class="badge hidden">Mode démo (données non sauvegardées)</span>
-    <button id="btn-settings" class="icon-btn" title="Configurer la source de données">⚙ Configuration</button>
+    <div class="menu-wrap">
+      <button id="btn-menu" class="icon-btn" aria-haspopup="true" aria-expanded="false">☰ Menu</button>
+      <nav id="main-menu" class="main-menu hidden">
+        <button type="button" class="menu-item active" data-view="adherents">Adhérents</button>
+        <button type="button" class="menu-item" data-view="declarations">Déclarations — Décès et dépenses</button>
+        <button type="button" class="menu-item" data-view="rapports">Rapports</button>
+        <button type="button" class="menu-item" data-view="documents">Documents</button>
+        <button type="button" class="menu-item" data-view="archives">Archives</button>
+        <button type="button" class="menu-item" id="menu-configuration">Configuration</button>
+      </nav>
+    </div>
   </div>
 </header>
 
-<main class="layout">
+<main>
 
-  <!-- Colonne gauche : liste des adhérents -->
-  <section class="panel panel-list">
-    <div class="search-row">
-      <input type="search" id="search-input" placeholder="Recherche (nom, prénom)…" autocomplete="off">
-    </div>
-    <div class="actions-row">
-      <button id="btn-new" class="btn">Nouveau</button>
-      <button id="btn-edit" class="btn" disabled>Modifier</button>
-      <button id="btn-delete" class="btn btn-danger" disabled>Supprimer</button>
-    </div>
-    <div class="table-wrap">
-      <table id="adherents-table">
-        <thead>
-          <tr><th>Nom</th><th>Prénom</th></tr>
-        </thead>
-        <tbody id="adherents-tbody">
-        </tbody>
-      </table>
-      <p id="empty-list" class="empty-msg hidden">Aucun adhérent. Cliquez sur « Nouveau » pour en ajouter un.</p>
-    </div>
-  </section>
+  <!-- Vue : Adhérents -->
+  <section id="view-adherents" class="view">
+    <div class="layout">
 
-  <!-- Colonne droite -->
-  <section class="panel-right">
-
-    <div class="panel panel-dashboard">
-      <h2>Tableau de bord</h2>
-      <div class="dashboard-summary">
-        <div class="stat-card">
-          <span class="stat-label">Total cotisé (toutes années)</span>
-          <span class="stat-value" id="stat-total">0,00 €</span>
+      <!-- Colonne gauche : liste des adhérents -->
+      <section class="panel panel-list">
+        <div class="search-row">
+          <input type="search" id="search-input" placeholder="Recherche (nom, prénom)…" autocomplete="off">
         </div>
-        <div class="stat-card">
-          <span class="stat-label">Nombre d'adhérents</span>
-          <span class="stat-value" id="stat-count">0</span>
+        <div class="actions-row">
+          <button id="btn-new" class="btn">Nouveau</button>
+          <button id="btn-edit" class="btn" disabled>Modifier</button>
+          <button id="btn-delete" class="btn btn-danger" disabled>Supprimer</button>
         </div>
-      </div>
-      <div class="table-wrap table-wrap-flat">
-        <table id="year-table">
-          <thead>
-            <tr><th>Année</th><th>Nb cotisations</th><th>Total</th></tr>
-          </thead>
-          <tbody id="year-tbody">
-          </tbody>
-        </table>
-      </div>
-      <p id="empty-years" class="empty-msg hidden">Aucune cotisation enregistrée pour le moment.</p>
-    </div>
-
-    <div class="panel panel-details">
-      <h2>Détails sur l'adhérent</h2>
-
-      <div id="details-empty" class="empty-msg">Sélectionnez un adhérent dans la liste, ou créez-en un nouveau.</div>
-
-      <div id="details-content" class="hidden">
-        <div class="adherent-info">
-          <div class="info-grid">
-            <div><span class="info-label">Nom</span><span id="d-nom"></span></div>
-            <div><span class="info-label">Prénom</span><span id="d-prenom"></span></div>
-            <div><span class="info-label">Téléphone</span><span id="d-telephone"></span></div>
-            <div><span class="info-label">Email</span><span id="d-email"></span></div>
-            <div><span class="info-label">Date d'adhésion</span><span id="d-date-adhesion"></span></div>
-            <div><span class="info-label">Total cotisé</span><span id="d-total-cotise"></span></div>
-          </div>
-        </div>
-
-        <h3>Cotisations</h3>
-        <form id="cotisation-form" class="cotisation-form">
-          <input type="hidden" id="cot-id">
-          <div class="form-row">
-            <label>Montant (€)
-              <input type="number" id="cot-montant" step="0.01" min="0" required>
-            </label>
-            <label>Date
-              <input type="date" id="cot-date" required>
-            </label>
-            <label>Statut
-              <select id="cot-statut" required>
-                <option value="Travail">Travail</option>
-                <option value="Sans travail">Sans travail</option>
-                <option value="Malade">Malade</option>
-                <option value="Retraite">Retraite</option>
-                <option value="Conges">Congés</option>
-              </select>
-            </label>
-            <div class="form-buttons">
-              <button type="submit" id="cot-submit-btn" class="btn">Ajouter</button>
-              <button type="button" id="cot-cancel-btn" class="btn btn-secondary hidden">Annuler</button>
-            </div>
-          </div>
-        </form>
-
-        <div class="table-wrap table-wrap-flat">
-          <table id="cotisations-table">
+        <div class="table-wrap">
+          <table id="adherents-table">
             <thead>
-              <tr><th>Date</th><th>Montant</th><th>Statut</th><th></th></tr>
+              <tr><th>Nom</th><th>Prénom</th></tr>
             </thead>
-            <tbody id="cotisations-tbody">
+            <tbody id="adherents-tbody">
             </tbody>
           </table>
+          <p id="empty-list" class="empty-msg hidden">Aucun adhérent. Cliquez sur « Nouveau » pour en ajouter un.</p>
         </div>
-        <p id="empty-cotisations" class="empty-msg hidden">Aucune cotisation pour cet adhérent.</p>
-      </div>
-    </div>
+      </section>
 
+      <!-- Colonne droite -->
+      <section class="panel-right">
+
+        <div class="panel panel-dashboard">
+          <h2>Tableau de bord</h2>
+          <div class="dashboard-summary">
+            <div class="stat-card">
+              <span class="stat-label">Total cotisé (toutes années)</span>
+              <span class="stat-value" id="stat-total">0,00 €</span>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label">Nombre d'adhérents</span>
+              <span class="stat-value" id="stat-count">0</span>
+            </div>
+          </div>
+          <div class="table-wrap table-wrap-flat">
+            <table id="year-table">
+              <thead>
+                <tr><th>Année</th><th>Nb cotisations</th><th>Total</th></tr>
+              </thead>
+              <tbody id="year-tbody">
+              </tbody>
+            </table>
+          </div>
+          <p id="empty-years" class="empty-msg hidden">Aucune cotisation enregistrée pour le moment.</p>
+        </div>
+
+        <div class="panel panel-details">
+          <h2>Détails sur l'adhérent</h2>
+
+          <div id="details-empty" class="empty-msg">Sélectionnez un adhérent dans la liste, ou créez-en un nouveau.</div>
+
+          <div id="details-content" class="hidden">
+            <div class="adherent-info">
+              <div class="info-grid">
+                <div><span class="info-label">Nom</span><span id="d-nom"></span></div>
+                <div><span class="info-label">Prénom</span><span id="d-prenom"></span></div>
+                <div><span class="info-label">Téléphone</span><span id="d-telephone"></span></div>
+                <div><span class="info-label">Email</span><span id="d-email"></span></div>
+                <div><span class="info-label">Date d'adhésion</span><span id="d-date-adhesion"></span></div>
+                <div><span class="info-label">Total cotisé</span><span id="d-total-cotise"></span></div>
+              </div>
+            </div>
+
+            <h3>Cotisations</h3>
+            <form id="cotisation-form" class="cotisation-form">
+              <input type="hidden" id="cot-id">
+              <div class="form-row">
+                <label>Montant (€)
+                  <input type="number" id="cot-montant" step="0.01" min="0" required>
+                </label>
+                <label>Date
+                  <input type="date" id="cot-date" required>
+                </label>
+                <label>Statut
+                  <select id="cot-statut" required>
+                    <option value="Travail">Travail</option>
+                    <option value="Sans travail">Sans travail</option>
+                    <option value="Malade">Malade</option>
+                    <option value="Retraite">Retraite</option>
+                    <option value="Conges">Congés</option>
+                  </select>
+                </label>
+                <div class="form-buttons">
+                  <button type="submit" id="cot-submit-btn" class="btn">Ajouter</button>
+                  <button type="button" id="cot-cancel-btn" class="btn btn-secondary hidden">Annuler</button>
+                </div>
+              </div>
+            </form>
+
+            <div class="table-wrap table-wrap-flat">
+              <table id="cotisations-table">
+                <thead>
+                  <tr><th>Date</th><th>Montant</th><th>Statut</th><th></th></tr>
+                </thead>
+                <tbody id="cotisations-tbody">
+                </tbody>
+              </table>
+            </div>
+            <p id="empty-cotisations" class="empty-msg hidden">Aucune cotisation pour cet adhérent.</p>
+          </div>
+        </div>
+
+      </section>
+    </div>
   </section>
+
+  <!-- Vue : Déclarations — Décès et dépenses -->
+  <section id="view-declarations" class="view hidden">
+    <div class="page-wrap">
+      <h2>Déclarations — Décès et dépenses</h2>
+      <div class="declarations-grid">
+
+        <div class="declaration-block">
+          <div class="declaration-header">
+            <h3>Décès</h3>
+            <div class="declaration-header-right">
+              <span class="stat-mini">Total frais funéraires : <strong id="stat-deces-total">0,00 €</strong></span>
+              <button id="btn-new-deces" class="btn btn-sm">Déclarer un décès</button>
+            </div>
+          </div>
+          <div class="table-wrap table-wrap-flat">
+            <table id="deces-table">
+              <thead>
+                <tr><th>Nom</th><th>Prénom</th><th>Coût funérailles</th><th>Date</th><th>PJ</th><th></th></tr>
+              </thead>
+              <tbody id="deces-tbody"></tbody>
+            </table>
+          </div>
+          <p id="empty-deces" class="empty-msg hidden">Aucun décès déclaré.</p>
+        </div>
+
+        <div class="declaration-block">
+          <div class="declaration-header">
+            <h3>Dépenses</h3>
+            <div class="declaration-header-right">
+              <span class="stat-mini">Total dépenses : <strong id="stat-depenses-total">0,00 €</strong></span>
+              <span class="stat-mini"><strong id="stat-depenses-count">0</strong> dépense(s) déclarée(s)</span>
+              <button id="btn-new-depense" class="btn btn-sm">Déclarer une dépense</button>
+            </div>
+          </div>
+          <div class="table-wrap table-wrap-flat">
+            <table id="depenses-table">
+              <thead>
+                <tr><th>Date</th><th>Nature</th><th>Montant</th><th>PJ</th><th></th></tr>
+              </thead>
+              <tbody id="depenses-tbody"></tbody>
+            </table>
+          </div>
+          <p id="empty-depenses" class="empty-msg hidden">Aucune dépense déclarée.</p>
+        </div>
+
+      </div>
+    </div>
+  </section>
+
+  <!-- Vue : Rapports -->
+  <section id="view-rapports" class="view hidden">
+    <div class="page-wrap">
+      <div class="page-header">
+        <h2>Rapports</h2>
+        <button id="btn-print-rapports" class="btn btn-secondary no-print">🖨 Imprimer</button>
+      </div>
+
+      <div class="panel">
+        <div class="declaration-header">
+          <h3>Bilan financier par année</h3>
+          <button id="btn-export-bilan" class="btn btn-sm btn-secondary no-print">Exporter en CSV</button>
+        </div>
+        <p class="modal-help">Recettes = cotisations des adhérents. Dépenses = dépenses déclarées + frais funéraires des décès.</p>
+        <div class="table-wrap table-wrap-flat">
+          <table id="bilan-table">
+            <thead>
+              <tr><th>Année</th><th>Recettes</th><th>Dépenses</th><th>Solde</th></tr>
+            </thead>
+            <tbody id="bilan-tbody"></tbody>
+            <tfoot>
+              <tr class="totals-row">
+                <td>Total</td>
+                <td id="bilan-total-recettes">0,00 €</td>
+                <td id="bilan-total-depenses">0,00 €</td>
+                <td id="bilan-total-solde">0,00 €</td>
+              </tr>
+            </tfoot>
+          </table>
+        </div>
+        <p id="empty-bilan" class="empty-msg hidden">Aucune cotisation ni dépense enregistrée.</p>
+      </div>
+
+      <div class="panel">
+        <div class="declaration-header">
+          <h3>Cotisations par adhérent</h3>
+          <button id="btn-export-cotisations" class="btn btn-sm btn-secondary no-print">Exporter en CSV</button>
+        </div>
+        <div class="table-wrap table-wrap-flat">
+          <table id="rapport-cotisations-table">
+            <thead>
+              <tr><th>Nom</th><th>Prénom</th><th>Date</th><th>Montant</th><th>Statut</th></tr>
+            </thead>
+            <tbody id="rapport-cotisations-tbody"></tbody>
+          </table>
+        </div>
+        <p id="empty-rapport-cotisations" class="empty-msg hidden">Aucune cotisation enregistrée.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Vue : Documents -->
+  <section id="view-documents" class="view hidden">
+    <div class="page-wrap">
+      <h2>Documents</h2>
+
+      <div class="panel">
+        <div class="declaration-header">
+          <h3>Documents de l'association</h3>
+          <button id="btn-new-document" class="btn btn-sm">Ajouter un document</button>
+        </div>
+        <div class="table-wrap table-wrap-flat">
+          <table id="documents-table">
+            <thead>
+              <tr><th>Nom</th><th>Description</th><th>Date</th><th>Fichier</th><th></th></tr>
+            </thead>
+            <tbody id="documents-tbody"></tbody>
+          </table>
+        </div>
+        <p id="empty-documents" class="empty-msg hidden">Aucun document ajouté.</p>
+      </div>
+
+      <div class="panel">
+        <h3>Pièces jointes des décès et dépenses</h3>
+        <div class="table-wrap table-wrap-flat">
+          <table id="pj-aggregate-table">
+            <thead>
+              <tr><th>Origine</th><th>Libellé</th><th>Date</th><th>Fichier</th></tr>
+            </thead>
+            <tbody id="pj-aggregate-tbody"></tbody>
+          </table>
+        </div>
+        <p id="empty-pj-aggregate" class="empty-msg hidden">Aucune pièce jointe.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Vue : Archives -->
+  <section id="view-archives" class="view hidden">
+    <div class="page-wrap">
+      <h2>Archives</h2>
+      <p class="modal-help">
+        Cette page affiche le contenu de l'onglet <strong>Archives</strong> de votre Google Sheet, en
+        lecture seule. Pour ajouter, modifier ou supprimer des lignes, faites-le directement dans
+        Google Sheets — la page se met à jour au prochain chargement.
+      </p>
+
+      <div class="panel">
+        <div id="archives-not-configured" class="empty-msg hidden">
+          L'onglet « Archives » ne contient pas encore d'en-têtes de colonnes. Ouvrez votre Google
+          Sheet, ajoutez un onglet nommé « Archives » avec vos titres de colonnes en première ligne
+          (5 ou 6 colonnes), puis rechargez cette page.
+        </div>
+
+        <div id="archives-content">
+          <div class="search-row">
+            <input type="search" id="archives-search" placeholder="Recherche dans toutes les colonnes…" autocomplete="off">
+          </div>
+          <div id="archives-filters" class="archives-filters"></div>
+
+          <div class="table-wrap table-wrap-tall">
+            <table id="archives-table">
+              <thead>
+                <tr id="archives-thead-row"></tr>
+              </thead>
+              <tbody id="archives-tbody"></tbody>
+            </table>
+          </div>
+          <p id="empty-archives" class="empty-msg hidden">Aucune ligne ne correspond à la recherche/aux filtres.</p>
+        </div>
+      </div>
+    </div>
+  </section>
+
 </main>
-
-<!-- Déclarations : décès et dépenses -->
-<section class="panel panel-declarations">
-  <h2>Déclarations — Décès et dépenses</h2>
-  <div class="declarations-grid">
-
-    <div class="declaration-block">
-      <div class="declaration-header">
-        <h3>Décès</h3>
-        <div class="declaration-header-right">
-          <span class="stat-mini">Total frais funéraires : <strong id="stat-deces-total">0,00 €</strong></span>
-          <button id="btn-new-deces" class="btn btn-sm">Déclarer un décès</button>
-        </div>
-      </div>
-      <div class="table-wrap table-wrap-flat">
-        <table id="deces-table">
-          <thead>
-            <tr><th>Nom</th><th>Prénom</th><th>Coût funérailles</th><th>Date</th><th>PJ</th><th></th></tr>
-          </thead>
-          <tbody id="deces-tbody"></tbody>
-        </table>
-      </div>
-      <p id="empty-deces" class="empty-msg hidden">Aucun décès déclaré.</p>
-    </div>
-
-    <div class="declaration-block">
-      <div class="declaration-header">
-        <h3>Dépenses</h3>
-        <div class="declaration-header-right">
-          <span class="stat-mini">Total dépenses : <strong id="stat-depenses-total">0,00 €</strong></span>
-          <span class="stat-mini"><strong id="stat-depenses-count">0</strong> dépense(s) déclarée(s)</span>
-          <button id="btn-new-depense" class="btn btn-sm">Déclarer une dépense</button>
-        </div>
-      </div>
-      <div class="table-wrap table-wrap-flat">
-        <table id="depenses-table">
-          <thead>
-            <tr><th>Date</th><th>Nature</th><th>Montant</th><th>PJ</th><th></th></tr>
-          </thead>
-          <tbody id="depenses-tbody"></tbody>
-        </table>
-      </div>
-      <p id="empty-depenses" class="empty-msg hidden">Aucune dépense déclarée.</p>
-    </div>
-
-  </div>
-</section>
 
 <!-- Modale : créer / modifier un adhérent -->
 <div id="adherent-modal" class="modal-overlay hidden">
@@ -266,6 +409,33 @@
       <div class="modal-buttons">
         <button type="submit" class="btn">Enregistrer</button>
         <button type="button" id="depense-modal-cancel" class="btn btn-secondary">Annuler</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale : créer / modifier un document -->
+<div id="document-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 id="document-modal-title">Ajouter un document</h2>
+    <form id="document-form">
+      <input type="hidden" id="doc-id">
+      <label>Nom *
+        <input type="text" id="doc-nom" placeholder="Ex : statuts de l'association" required>
+      </label>
+      <label>Description
+        <input type="text" id="doc-description" placeholder="Précisions utiles (optionnel)">
+      </label>
+      <label>Date
+        <input type="date" id="doc-date">
+      </label>
+      <label>Fichier
+        <input type="file" id="doc-fichier">
+      </label>
+      <p id="doc-fichier-actuel" class="modal-help hidden"></p>
+      <div class="modal-buttons">
+        <button type="submit" class="btn">Enregistrer</button>
+        <button type="button" id="document-modal-cancel" class="btn btn-secondary">Annuler</button>
       </div>
     </form>
   </div>

@@ -1,8 +1,8 @@
 # Caisse — Gestion des adhérents
 
 Application web simple pour gérer les adhérents d'une association : fiche
-adhérent, cotisations (montant, date, statut) et tableau de bord avec le
-total des cotisations regroupé par année.
+adhérent, cotisations (montant, date, statut), déclarations de décès et de
+dépenses, rapports financiers et documents de l'association.
 
 - **Frontend** : HTML/CSS/JS, aucune installation ni compilation nécessaire.
   Se déploie gratuitement sur **GitHub Pages**.
@@ -11,6 +11,30 @@ total des cotisations regroupé par année.
 - **Mode démo** : si aucune source de données n'est configurée, l'appli
   fonctionne avec des données d'exemple en mémoire (rien n'est sauvegardé),
   ce qui permet de tester l'interface tout de suite.
+
+## Navigation
+
+L'appli est organisée en une seule page, avec un bouton **☰ Menu** en haut à
+droite qui donne accès à :
+
+- **Adhérents** — la vue par défaut : liste, recherche, fiche adhérent et
+  tableau de bord des cotisations (total par année).
+- **Déclarations — Décès et dépenses** — déclarer un décès (nom, prénom,
+  coût des funérailles, date, pièce jointe) ou une dépense (date, nature,
+  montant, pièce jointe).
+- **Rapports** — bilan financier par année (recettes des cotisations contre
+  dépenses + frais funéraires, avec le solde) et détail des cotisations par
+  adhérent ; chaque tableau peut être exporté en CSV, et la page dispose d'un
+  bouton **Imprimer** (impression navigateur, utilisable pour exporter en PDF).
+- **Documents** — une bibliothèque de documents de l'association (statuts, PV
+  de réunion…) avec pièce jointe, et une vue qui regroupe automatiquement
+  toutes les pièces jointes déjà attachées aux décès et dépenses.
+- **Archives** — affiche en **lecture seule** le contenu de l'onglet `Archives`
+  de votre Google Sheet, avec une recherche globale et des filtres par
+  colonne. Rien ne s'ajoute, ne se modifie ni ne se supprime depuis l'appli :
+  la gestion se fait directement dans Google Sheets.
+- **Configuration** — pour renseigner l'URL de votre Google Apps Script (voir
+  ci-dessous).
 
 ## 1. Tester tout de suite (mode démo)
 
@@ -56,7 +80,7 @@ n'avez pas configuré la Google Sheet (étape 2).
 ## 3. Connecter l'application à la Google Sheet
 
 1. Ouvrez `index.html` (localement, ou depuis GitHub Pages une fois publié).
-2. Cliquez sur **⚙ Configuration** en haut à droite.
+2. Cliquez sur **☰ Menu** en haut à droite, puis sur **Configuration**.
 3. Collez l'URL de l'application web copiée à l'étape précédente.
 4. Cliquez sur **Enregistrer**.
 
@@ -138,7 +162,39 @@ par année (à partir de la date de chaque cotisation).
 | Montant | montant de la dépense |
 | PieceJointeUrl / PieceJointeNom | lien Drive et nom du justificatif joint (optionnel) |
 
-### Pièces jointes (décès / dépenses)
+**Onglet `Documents`** (bibliothèque de documents de l'association)
+
+| Colonne | Description |
+|---|---|
+| ID | identifiant unique |
+| Nom | titre du document |
+| Description | précisions (optionnel) |
+| Date | date du document (optionnel) |
+| PieceJointeUrl / PieceJointeNom | lien Drive et nom du fichier joint (optionnel) |
+
+La page **Documents** affiche aussi, dans un second tableau en lecture seule,
+toutes les pièces jointes déjà attachées à des décès ou des dépenses — pas
+besoin de les rajouter manuellement ici.
+
+**Onglet `Archives`** (lecture seule)
+
+Contrairement aux autres onglets, celui-ci n'a **pas de colonnes fixes** : la
+première ligne de l'onglet définit les titres de colonnes que vous voulez
+(en général 5 ou 6, par exemple `Référence`, `Nom`, `Prénom`, `Catégorie`,
+`Année`). L'application les lit automatiquement et affiche vos données telles
+quelles, avec une recherche globale et un filtre déroulant par colonne (les
+colonnes ayant trop de valeurs différentes n'ont pas de filtre, pour rester
+lisibles).
+
+- Si l'onglet `Archives` n'existe pas encore, il est créé automatiquement
+  (avec des en-têtes de remplacement `Colonne 1`, `Colonne 2`…) dès le premier
+  chargement de l'application — remplacez ensuite ces en-têtes par les vôtres
+  directement dans Google Sheets.
+- Tout se gère dans Google Sheets : ajout, modification ou suppression de
+  lignes ou de colonnes. L'application se contente d'afficher le contenu à
+  jour à chaque rechargement de la page Archives.
+
+### Pièces jointes (décès / dépenses / documents)
 
 Quand une pièce jointe est ajoutée depuis l'appli, le script la dépose dans un
 dossier Google Drive nommé **« Caisse - Pieces jointes »**, créé automatiquement
@@ -146,8 +202,8 @@ dossier Google Drive nommé **« Caisse - Pieces jointes »**, créé automatiqu
 
 - Si vous avez déjà déployé le script avant d'ajouter cette fonctionnalité,
   créez un **nouveau déploiement** (voir l'avertissement à l'étape 2) pour que
-  les nouvelles actions (`createDeces`, `createDepense`, etc.) soient prises
-  en compte.
+  les nouvelles actions (`createDeces`, `createDepense`, `createDocument`, etc.)
+  soient prises en compte.
 - La première utilisation d'une pièce jointe peut redemander une autorisation
   Google, car le script a désormais aussi besoin d'accéder à Google Drive.
 - Gardez les fichiers joints raisonnables (quelques Mo) : ils transitent en
