@@ -19,6 +19,16 @@
  * Depenses
  *   ID | Date | Nature | Montant | PieceJointeUrl | PieceJointeNom
  *
+ * Documents
+ *   ID | Nom | Description | Date | PieceJointeUrl | PieceJointeNom
+ *
+ * Archives (lecture seule — gérée directement dans Google Sheets)
+ *   Colonnes libres, définies par la ligne 1 de l'onglet "Archives" (5 ou 6
+ *   colonnes en général). L'application affiche ces colonnes et ces lignes
+ *   telles quelles, sans possibilité d'ajout/modification/suppression depuis
+ *   l'appli. Si l'onglet n'existe pas encore, il est créé automatiquement
+ *   avec des en-têtes de remplacement à personnaliser dans Google Sheets.
+ *
  * Statuts possibles (Cotisations) : "Sans travail", "Travail", "Malade", "Retraite", "Conges"
  *
  * Les pièces jointes (Deces / Depenses) sont envoyées par le frontend en base64
@@ -30,11 +40,15 @@ var SHEET_ADHERENTS = 'Adherents';
 var SHEET_COTISATIONS = 'Cotisations';
 var SHEET_DECES = 'Deces';
 var SHEET_DEPENSES = 'Depenses';
+var SHEET_DOCUMENTS = 'Documents';
+var SHEET_ARCHIVES = 'Archives';
 
 var ADHERENTS_HEADERS = ['ID', 'Nom', 'Prenom', 'Telephone', 'Email', 'DateAdhesion'];
 var COTISATIONS_HEADERS = ['ID', 'AdherentID', 'Montant', 'Date', 'Statut'];
 var DECES_HEADERS = ['ID', 'Nom', 'Prenom', 'CoutFuneraire', 'Date', 'PieceJointeUrl', 'PieceJointeNom'];
 var DEPENSES_HEADERS = ['ID', 'Date', 'Nature', 'Montant', 'PieceJointeUrl', 'PieceJointeNom'];
+var DOCUMENTS_HEADERS = ['ID', 'Nom', 'Description', 'Date', 'PieceJointeUrl', 'PieceJointeNom'];
+var ARCHIVES_PLACEHOLDER_HEADERS = ['Colonne 1', 'Colonne 2', 'Colonne 3', 'Colonne 4', 'Colonne 5'];
 
 var PIECES_JOINTES_FOLDER = 'Caisse - Pieces jointes';
 
@@ -89,6 +103,40 @@ function findRowById_(sheet, headers, id) {
   return -1;
 }
 
+/**
+ * L'onglet Archives a une structure de colonnes libre (définie par l'utilisateur
+ * directement dans Google Sheets), contrairement aux autres onglets. On crée un
+ * onglet de remplacement s'il n'existe pas encore, mais on ne force jamais ses
+ * en-têtes ensuite : ils sont relus dynamiquement à chaque appel.
+ */
+function getOrCreateArchivesSheet_() {
+  var ss = SpreadsheetApp.getActiveSpreadsheet();
+  var sheet = ss.getSheetByName(SHEET_ARCHIVES);
+  if (!sheet) {
+    sheet = ss.insertSheet(SHEET_ARCHIVES);
+    sheet.appendRow(ARCHIVES_PLACEHOLDER_HEADERS);
+    sheet.setFrozenRows(1);
+  }
+  return sheet;
+}
+
+/**
+ * Lit dynamiquement les en-têtes (ligne 1) de l'onglet Archives : nombre de
+ * colonnes variable, en-têtes définis librement dans Google Sheets. Les
+ * cellules vides en fin de ligne sont ignorées.
+ */
+function getArchivesHeaders_(sheet) {
+  var lastCol = sheet.getLastColumn();
+  if (lastCol < 1) return [];
+  var values = sheet.getRange(1, 1, 1, lastCol).getValues()[0];
+  var headers = [];
+  for (var i = 0; i < values.length; i++) {
+    var h = String(values[i] === null || values[i] === undefined ? '' : values[i]).trim();
+    if (h !== '') headers.push(h);
+  }
+  return headers;
+}
+
 /* ---------------------------------------------------------------------- */
 /* Entrées HTTP                                                           */
 /* ---------------------------------------------------------------------- */
@@ -99,18 +147,25 @@ function doGet(e) {
     var cotisationsSheet = getOrCreateSheet_(SHEET_COTISATIONS, COTISATIONS_HEADERS);
     var decesSheet = getOrCreateSheet_(SHEET_DECES, DECES_HEADERS);
     var depensesSheet = getOrCreateSheet_(SHEET_DEPENSES, DEPENSES_HEADERS);
+    var documentsSheet = getOrCreateSheet_(SHEET_DOCUMENTS, DOCUMENTS_HEADERS);
+    var archivesSheet = getOrCreateArchivesSheet_();
 
     var adherents = sheetToObjects_(adherentsSheet, ADHERENTS_HEADERS);
     var cotisations = sheetToObjects_(cotisationsSheet, COTISATIONS_HEADERS);
     var deces = sheetToObjects_(decesSheet, DECES_HEADERS);
     var depenses = sheetToObjects_(depensesSheet, DEPENSES_HEADERS);
+    var documents = sheetToObjects_(documentsSheet, DOCUMENTS_HEADERS);
+    var archivesHeaders = getArchivesHeaders_(archivesSheet);
+    var archivesRows = archivesHeaders.length ? sheetToObjects_(archivesSheet, archivesHeaders) : [];
 
     return jsonResponse_({
       success: true,
       adherents: adherents,
       cotisations: cotisations,
       deces: deces,
-      depenses: depenses
+      depenses: depenses,
+      documents: documents,
+      archives: { headers: archivesHeaders, rows: archivesRows }
     });
   } catch (err) {
     return jsonResponse_({ success: false, error: String(err) });
@@ -163,6 +218,15 @@ function doPost(e) {
         break;
       case 'deleteDepense':
         result = deleteDepense_(payload);
+        break;
+      case 'createDocument':
+        result = createDocument_(payload);
+        break;
+      case 'updateDocument':
+        result = updateDocument_(payload);
+        break;
+      case 'deleteDocument':
+        result = deleteDocument_(payload);
         break;
       default:
         return jsonResponse_({ success: false, error: 'Action inconnue: ' + action });
@@ -390,6 +454,48 @@ function updateDepense_(payload) {
 function deleteDepense_(payload) {
   var sheet = getOrCreateSheet_(SHEET_DEPENSES, DEPENSES_HEADERS);
   var row = findRowById_(sheet, DEPENSES_HEADERS, payload.id);
+  if (row !== -1) sheet.deleteRow(row);
+  return { id: payload.id };
+}
+
+/* ---------------------------------------------------------------------- */
+/* Documents                                                              */
+/* ---------------------------------------------------------------------- */
+
+function createDocument_(payload) {
+  var sheet = getOrCreateSheet_(SHEET_DOCUMENTS, DOCUMENTS_HEADERS);
+  var id = Utilities.getUuid();
+  var pj = savePieceJointe_(payload.pieceJointe);
+  sheet.appendRow([
+    id,
+    payload.nom || '',
+    payload.description || '',
+    payload.date || '',
+    pj ? pj.url : (payload.pieceJointeUrl || ''),
+    pj ? pj.name : (payload.pieceJointeNom || '')
+  ]);
+  return { id: id };
+}
+
+function updateDocument_(payload) {
+  var sheet = getOrCreateSheet_(SHEET_DOCUMENTS, DOCUMENTS_HEADERS);
+  var row = findRowById_(sheet, DOCUMENTS_HEADERS, payload.id);
+  if (row === -1) throw new Error('Document introuvable: ' + payload.id);
+  var pj = savePieceJointe_(payload.pieceJointe);
+  sheet.getRange(row, 1, 1, DOCUMENTS_HEADERS.length).setValues([[
+    payload.id,
+    payload.nom || '',
+    payload.description || '',
+    payload.date || '',
+    pj ? pj.url : (payload.pieceJointeUrl || ''),
+    pj ? pj.name : (payload.pieceJointeNom || '')
+  ]]);
+  return { id: payload.id };
+}
+
+function deleteDocument_(payload) {
+  var sheet = getOrCreateSheet_(SHEET_DOCUMENTS, DOCUMENTS_HEADERS);
+  var row = findRowById_(sheet, DOCUMENTS_HEADERS, payload.id);
   if (row !== -1) sheet.deleteRow(row);
   return { id: payload.id };
 }
