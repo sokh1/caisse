@@ -20,7 +20,8 @@ const STATUT_LABELS = {
   'Sans travail': 'Sans travail',
   'Malade': 'Malade',
   'Retraite': 'Retraite',
-  'Conges': 'Congés'
+  'Conges': 'Congés',
+  'Etudiant': 'Étudiant'
 };
 
 /* ---------------------------------------------------------------------- */
@@ -59,6 +60,13 @@ function adherentName(a) {
   return `${a.Nom || ''} ${a.Prenom || ''}`.trim();
 }
 
+function isArchived(a) {
+  const v = a && a.Archive;
+  if (v === undefined || v === null || v === '') return false;
+  const s = String(v).trim().toLowerCase();
+  return s !== '' && s !== '0' && s !== 'false' && s !== 'non';
+}
+
 /* ---------------------------------------------------------------------- */
 /* Chargement des données                                                  */
 /* ---------------------------------------------------------------------- */
@@ -84,6 +92,7 @@ async function loadAll(preserveSelection) {
     renderRapports();
     renderDocuments();
     renderArchives();
+    renderArchivedAdherents();
   } catch (err) {
     showToast('Erreur de chargement : ' + err.message, true);
   }
@@ -129,7 +138,7 @@ function toggleMainMenu() {
 
 function filteredAdherents() {
   const q = $('search-input').value.trim().toLowerCase();
-  let list = state.adherents.slice().sort((a, b) => adherentName(a).localeCompare(adherentName(b), 'fr'));
+  let list = state.adherents.filter(a => !isArchived(a)).sort((a, b) => adherentName(a).localeCompare(adherentName(b), 'fr'));
   if (!q) return list;
   return list.filter(a =>
     (a.Nom || '').toLowerCase().includes(q) ||
@@ -147,7 +156,7 @@ function renderAdherentsTable() {
     const tr = document.createElement('tr');
     tr.dataset.id = a.ID;
     if (a.ID === state.selectedId) tr.classList.add('selected');
-    tr.innerHTML = `<td>${escapeHtml(a.Nom || '')}</td><td>${escapeHtml(a.Prenom || '')}</td>`;
+    tr.innerHTML = `<td>${escapeHtml(a.Civilite || '—')}</td><td>${escapeHtml(a.Nom || '')}</td><td>${escapeHtml(a.Prenom || '')}</td>`;
     tr.addEventListener('click', () => selectAdherent(a.ID));
     tbody.appendChild(tr);
   }
@@ -155,6 +164,7 @@ function renderAdherentsTable() {
   const hasSelection = !!state.selectedId;
   $('btn-edit').disabled = !hasSelection;
   $('btn-delete').disabled = !hasSelection;
+  $('btn-archive').disabled = !hasSelection;
 }
 
 function selectAdherent(id) {
@@ -177,7 +187,7 @@ function escapeHtml(str) {
 function renderDashboard() {
   const total = state.cotisations.reduce((sum, c) => sum + Number(c.Montant || 0), 0);
   $('stat-total').textContent = formatMontant(total);
-  $('stat-count').textContent = state.adherents.length;
+  $('stat-count').textContent = state.adherents.filter(a => !isArchived(a)).length;
 
   const byYear = {};
   for (const c of state.cotisations) {
@@ -212,6 +222,7 @@ function renderDetails() {
   $('details-content').classList.toggle('hidden', !a);
   if (!a) return;
 
+  $('d-civilite').textContent = a.Civilite || '—';
   $('d-nom').textContent = a.Nom || '';
   $('d-prenom').textContent = a.Prenom || '';
   $('d-telephone').textContent = a.Telephone || '—';
@@ -285,6 +296,52 @@ async function confirmDeleteCotisation(c) {
       }
     }
   );
+}
+
+/* ---------------------------------------------------------------------- */
+/* Adhérents archivés                                                      */
+/* ---------------------------------------------------------------------- */
+
+function renderArchivedAdherents() {
+  const list = state.adherents.filter(isArchived).sort((a, b) => adherentName(a).localeCompare(adherentName(b), 'fr'));
+  $('stat-archived-count').textContent = list.length;
+
+  const tbody = $('archived-adherents-tbody');
+  tbody.innerHTML = '';
+  for (const a of list) {
+    const total = state.cotisations
+      .filter(c => c.AdherentID === a.ID)
+      .reduce((s, c) => s + Number(c.Montant || 0), 0);
+
+    const tr = document.createElement('tr');
+    tr.innerHTML = `
+      <td>${escapeHtml(a.Civilite || '—')}</td>
+      <td>${escapeHtml(a.Nom || '')}</td>
+      <td>${escapeHtml(a.Prenom || '')}</td>
+      <td>${formatMontant(total)}</td>
+      <td class="row-actions"></td>
+    `;
+    const actionsTd = tr.querySelector('.row-actions');
+
+    const reactivateBtn = document.createElement('button');
+    reactivateBtn.textContent = 'Réactiver';
+    reactivateBtn.className = 'btn btn-secondary btn-sm';
+    reactivateBtn.addEventListener('click', () => {
+      openConfirmModal(`Réactiver ${adherentName(a)} ? Il/elle réapparaîtra dans la liste des adhérents.`, async () => {
+        try {
+          await Api.unarchiveAdherent(a.ID);
+          showToast('Adhérent réactivé.');
+          await loadAll(false);
+        } catch (err) {
+          showToast('Erreur : ' + err.message, true);
+        }
+      });
+    });
+
+    actionsTd.appendChild(reactivateBtn);
+    tbody.appendChild(tr);
+  }
+  $('empty-archived-adherents').classList.toggle('hidden', list.length !== 0);
 }
 
 /* ---------------------------------------------------------------------- */
@@ -571,6 +628,7 @@ function getCotisationsRapportRows() {
     .map(c => {
       const a = state.adherents.find(a => a.ID === c.AdherentID);
       return {
+        civilite: a ? a.Civilite : '',
         nom: a ? a.Nom : '',
         prenom: a ? a.Prenom : '',
         date: c.Date,
@@ -617,6 +675,7 @@ function renderRapports() {
   for (const r of rows) {
     const tr = document.createElement('tr');
     tr.innerHTML = `
+      <td>${escapeHtml(r.civilite || '—')}</td>
       <td>${escapeHtml(r.nom)}</td>
       <td>${escapeHtml(r.prenom)}</td>
       <td>${escapeHtml(formatDate(r.date))}</td>
@@ -640,9 +699,9 @@ function exportBilanCsv() {
 }
 
 function exportCotisationsCsv() {
-  const rows = [['Nom', 'Prénom', 'Date', 'Montant', 'Statut']];
+  const rows = [['Civilité', 'Nom', 'Prénom', 'Date', 'Montant', 'Statut']];
   for (const r of getCotisationsRapportRows()) {
-    rows.push([r.nom, r.prenom, r.date || '', Number(r.montant || 0).toFixed(2), STATUT_LABELS[r.statut] || r.statut || '']);
+    rows.push([r.civilite || '', r.nom, r.prenom, r.date || '', Number(r.montant || 0).toFixed(2), STATUT_LABELS[r.statut] || r.statut || '']);
   }
   downloadCsv('cotisations-par-adherent.csv', rows);
 }
@@ -892,6 +951,7 @@ function openAdherentModal(adherent) {
   if (adherent) {
     $('adherent-modal-title').textContent = 'Modifier l\'adhérent';
     $('a-id').value = adherent.ID;
+    $('a-civilite').value = adherent.Civilite || 'M.';
     $('a-nom').value = adherent.Nom || '';
     $('a-prenom').value = adherent.Prenom || '';
     $('a-telephone').value = adherent.Telephone || '';
@@ -900,6 +960,7 @@ function openAdherentModal(adherent) {
   } else {
     $('adherent-modal-title').textContent = 'Nouvel adhérent';
     $('a-id').value = '';
+    $('a-civilite').value = 'M.';
   }
   $('adherent-modal').classList.remove('hidden');
   $('a-nom').focus();
@@ -913,6 +974,7 @@ async function handleAdherentSubmit(evt) {
   evt.preventDefault();
   const id = $('a-id').value;
   const data = {
+    civilite: $('a-civilite').value,
     nom: $('a-nom').value.trim(),
     prenom: $('a-prenom').value.trim(),
     telephone: $('a-telephone').value.trim(),
@@ -1038,6 +1100,24 @@ function init() {
 
   $('adherent-form').addEventListener('submit', handleAdherentSubmit);
   $('adherent-modal-cancel').addEventListener('click', closeAdherentModal);
+
+  $('btn-archive').addEventListener('click', () => {
+    const a = currentAdherent();
+    if (!a) return;
+    openConfirmModal(
+      `Archiver ${adherentName(a)} ? Il/elle sera retiré(e) de la liste des adhérents, mais ses cotisations resteront comptabilisées dans le total cotisé.`,
+      async () => {
+        try {
+          await Api.archiveAdherent(a.ID);
+          state.selectedId = null;
+          showToast('Adhérent archivé.');
+          await loadAll(false);
+        } catch (err) {
+          showToast('Erreur : ' + err.message, true);
+        }
+      }
+    );
+  });
 
   $('confirm-yes').addEventListener('click', async () => {
     const cb = confirmCallback;

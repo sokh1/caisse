@@ -39,13 +39,15 @@ const Api = (() => {
   }
 
   const demoAdherents = [
-    { ID: uid(), Nom: 'Diop', Prenom: 'Awa', Telephone: '06 12 34 56 78', Email: 'awa.diop@example.com', DateAdhesion: '2023-01-15' },
-    { ID: uid(), Nom: 'Fall', Prenom: 'Moussa', Telephone: '06 98 76 54 32', Email: 'moussa.fall@example.com', DateAdhesion: '2022-06-02' }
+    { ID: uid(), Civilite: 'Mme', Nom: 'Diop', Prenom: 'Awa', Telephone: '06 12 34 56 78', Email: 'awa.diop@example.com', DateAdhesion: '2023-01-15' },
+    { ID: uid(), Civilite: 'M.', Nom: 'Fall', Prenom: 'Moussa', Telephone: '06 98 76 54 32', Email: 'moussa.fall@example.com', DateAdhesion: '2022-06-02' },
+    { ID: uid(), Civilite: 'Mme', Nom: 'Sow', Prenom: 'Fatou', Telephone: '', Email: '', DateAdhesion: '2021-03-10', Archive: '1' }
   ];
   const demoCotisations = [
     { ID: uid(), AdherentID: demoAdherents[0].ID, Montant: 20, Date: '2024-02-10', Statut: 'Travail' },
     { ID: uid(), AdherentID: demoAdherents[0].ID, Montant: 20, Date: '2025-02-12', Statut: 'Travail' },
-    { ID: uid(), AdherentID: demoAdherents[1].ID, Montant: 15, Date: '2024-05-01', Statut: 'Retraite' }
+    { ID: uid(), AdherentID: demoAdherents[1].ID, Montant: 15, Date: '2024-05-01', Statut: 'Retraite' },
+    { ID: uid(), AdherentID: demoAdherents[2].ID, Montant: 20, Date: '2022-04-03', Statut: 'Travail' }
   ];
   const demoDeces = [];
   const demoDepenses = [];
@@ -127,7 +129,7 @@ const Api = (() => {
   async function createAdherent(data) {
     if (isDemoMode()) {
       const rec = {
-        ID: uid(), Nom: data.nom, Prenom: data.prenom,
+        ID: uid(), Civilite: data.civilite || '', Nom: data.nom, Prenom: data.prenom,
         Telephone: data.telephone || '', Email: data.email || '',
         DateAdhesion: data.dateAdhesion || ''
       };
@@ -141,7 +143,7 @@ const Api = (() => {
     if (isDemoMode()) {
       const rec = demoAdherents.find(a => a.ID === data.id);
       if (rec) {
-        rec.Nom = data.nom; rec.Prenom = data.prenom;
+        rec.Civilite = data.civilite || ''; rec.Nom = data.nom; rec.Prenom = data.prenom;
         rec.Telephone = data.telephone || ''; rec.Email = data.email || '';
         rec.DateAdhesion = data.dateAdhesion || '';
       }
@@ -160,6 +162,26 @@ const Api = (() => {
       return { id };
     }
     return remotePost('deleteAdherent', { id });
+  }
+
+  // Archiver un adhérent le retire de la liste active sans toucher à ses cotisations
+  // (contrairement à deleteAdherent, qui supprime aussi les cotisations liées).
+  async function archiveAdherent(id) {
+    if (isDemoMode()) {
+      const rec = demoAdherents.find(a => a.ID === id);
+      if (rec) rec.Archive = '1';
+      return { id };
+    }
+    return remotePost('archiveAdherent', { id });
+  }
+
+  async function unarchiveAdherent(id) {
+    if (isDemoMode()) {
+      const rec = demoAdherents.find(a => a.ID === id);
+      if (rec) rec.Archive = '';
+      return { id };
+    }
+    return remotePost('unarchiveAdherent', { id });
   }
 
   async function createCotisation(data) {
@@ -303,7 +325,7 @@ const Api = (() => {
 
   return {
     getApiUrl, setApiUrl, isDemoMode, getAll,
-    createAdherent, updateAdherent, deleteAdherent,
+    createAdherent, updateAdherent, deleteAdherent, archiveAdherent, unarchiveAdherent,
     createCotisation, updateCotisation, deleteCotisation,
     createDeces, updateDeces, deleteDeces,
     createDepense, updateDepense, deleteDepense,
