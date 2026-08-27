@@ -202,6 +202,14 @@ tbody td {
   white-space: nowrap;
 }
 
+#adherents-table th:first-child,
+#adherents-table td:first-child,
+#rapport-cotisations-table th:first-child,
+#rapport-cotisations-table td:first-child {
+  width: 1%;
+  white-space: nowrap;
+}
+
 #adherents-tbody tr {
   cursor: pointer;
 }
@@ -524,7 +532,7 @@ tbody td {
 
   .topbar-actions {
     width: 100%;
-    justify-content: space-between;
+    justify-content: flex-end;
     flex-wrap: wrap;
     gap: 8px;
   }
