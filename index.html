@@ -16,6 +16,7 @@
       <button id="btn-menu" class="icon-btn" aria-haspopup="true" aria-expanded="false">☰ Menu</button>
       <nav id="main-menu" class="main-menu hidden">
         <button type="button" class="menu-item active" data-view="adherents">Adhérents</button>
+        <button type="button" class="menu-item" data-view="adherents-archives">Adhérents archivés</button>
         <button type="button" class="menu-item" data-view="declarations">Déclarations — Décès et dépenses</button>
         <button type="button" class="menu-item" data-view="rapports">Rapports</button>
         <button type="button" class="menu-item" data-view="documents">Documents</button>
@@ -41,11 +42,12 @@
           <button id="btn-new" class="btn">Nouveau</button>
           <button id="btn-edit" class="btn" disabled>Modifier</button>
           <button id="btn-delete" class="btn btn-danger" disabled>Supprimer</button>
+          <button id="btn-archive" class="btn btn-secondary" disabled>Archiver</button>
         </div>
         <div class="table-wrap">
           <table id="adherents-table">
             <thead>
-              <tr><th>Nom</th><th>Prénom</th></tr>
+              <tr><th>Civ.</th><th>Nom</th><th>Prénom</th></tr>
             </thead>
             <tbody id="adherents-tbody">
             </tbody>
@@ -89,6 +91,7 @@
           <div id="details-content" class="hidden">
             <div class="adherent-info">
               <div class="info-grid">
+                <div><span class="info-label">Civilité</span><span id="d-civilite"></span></div>
                 <div><span class="info-label">Nom</span><span id="d-nom"></span></div>
                 <div><span class="info-label">Prénom</span><span id="d-prenom"></span></div>
                 <div><span class="info-label">Téléphone</span><span id="d-telephone"></span></div>
@@ -115,6 +118,7 @@
                     <option value="Malade">Malade</option>
                     <option value="Retraite">Retraite</option>
                     <option value="Conges">Congés</option>
+                    <option value="Etudiant">Étudiant</option>
                   </select>
                 </label>
                 <div class="form-buttons">
@@ -138,6 +142,33 @@
         </div>
 
       </section>
+    </div>
+  </section>
+
+  <!-- Vue : Adhérents archivés -->
+  <section id="view-adherents-archives" class="view hidden">
+    <div class="page-wrap">
+      <h2>Adhérents archivés</h2>
+      <div class="panel">
+        <div class="declaration-header">
+          <h3>Liste des adhérents archivés</h3>
+          <span class="stat-mini"><strong id="stat-archived-count">0</strong> adhérent(s) archivé(s)</span>
+        </div>
+        <p class="modal-help">
+          Un adhérent archivé n'apparaît plus dans la liste des Adhérents ni dans le sélecteur de
+          cotisations, mais ses cotisations restent comptabilisées dans le total cotisé et le bilan par
+          année du tableau de bord. Vous pouvez le réactiver à tout moment.
+        </p>
+        <div class="table-wrap table-wrap-flat">
+          <table id="archived-adherents-table">
+            <thead>
+              <tr><th>Civ.</th><th>Nom</th><th>Prénom</th><th>Total cotisé</th><th></th></tr>
+            </thead>
+            <tbody id="archived-adherents-tbody"></tbody>
+          </table>
+        </div>
+        <p id="empty-archived-adherents" class="empty-msg hidden">Aucun adhérent archivé.</p>
+      </div>
     </div>
   </section>
 
@@ -231,7 +262,7 @@
         <div class="table-wrap table-wrap-flat">
           <table id="rapport-cotisations-table">
             <thead>
-              <tr><th>Nom</th><th>Prénom</th><th>Date</th><th>Montant</th><th>Statut</th></tr>
+              <tr><th>Civ.</th><th>Nom</th><th>Prénom</th><th>Date</th><th>Montant</th><th>Statut</th></tr>
             </thead>
             <tbody id="rapport-cotisations-tbody"></tbody>
           </table>
@@ -322,6 +353,13 @@
     <h2 id="adherent-modal-title">Nouvel adhérent</h2>
     <form id="adherent-form">
       <input type="hidden" id="a-id">
+      <label>Civilité *
+        <select id="a-civilite" required>
+          <option value="M.">M.</option>
+          <option value="Mme">Mme</option>
+          <option value="Mlle">Mlle</option>
+        </select>
+      </label>
       <label>Nom *
         <input type="text" id="a-nom" list="noms-datalist" autocomplete="off" required>
         <datalist id="noms-datalist">

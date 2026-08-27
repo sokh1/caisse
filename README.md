@@ -18,7 +18,12 @@ L'appli est organisée en une seule page, avec un bouton **☰ Menu** en haut à
 droite qui donne accès à :
 
 - **Adhérents** — la vue par défaut : liste, recherche, fiche adhérent et
-  tableau de bord des cotisations (total par année).
+  tableau de bord des cotisations (total par année). Un adhérent peut être
+  **archivé** (bouton à côté de « Supprimer ») : il disparaît de la liste
+  active, mais ses cotisations restent comptabilisées dans le total cotisé et
+  le bilan par année — contrairement à « Supprimer », qui efface aussi ses
+  cotisations. Un second tableau de bord en bas de page liste les adhérents
+  archivés (avec leur total cotisé) et permet de les réactiver.
 - **Déclarations — Décès et dépenses** — déclarer un décès (nom, prénom,
   coût des funérailles, date, pièce jointe) ou une dépense (date, nature,
   montant, pièce jointe).
@@ -128,6 +133,14 @@ dans ce cas : l'URL du script sera visible publiquement dans le code source.
 | Telephone | téléphone (optionnel) |
 | Email | email (optionnel) |
 | DateAdhesion | date d'adhésion (optionnel) |
+| Civilite | civilité : `M.`, `Mme` ou `Mlle` |
+| Archive | `1` si l'adhérent a été archivé depuis l'appli, vide sinon |
+
+> Les colonnes `Civilite` et `Archive` sont ajoutées en dernière position
+> (après `DateAdhesion`) pour rester compatibles avec une Google Sheet déjà en
+> place : si vous aviez déjà des adhérents, les en-têtes manquants sont
+> ajoutés automatiquement en fin de ligne 1 au prochain chargement, sans
+> toucher aux données existantes.
 
 **Onglet `Cotisations`**
 
@@ -137,7 +150,7 @@ dans ce cas : l'URL du script sera visible publiquement dans le code source.
 | AdherentID | référence vers l'adhérent |
 | Montant | montant versé |
 | Date | date du versement |
-| Statut | situation de l'adhérent à cette date : Travail, Sans travail, Malade, Retraite, Conges |
+| Statut | situation de l'adhérent à cette date : Travail, Sans travail, Malade, Retraite, Conges, Etudiant |
 
 Le tableau de bord additionne automatiquement les montants et les regroupe
 par année (à partir de la date de chaque cotisation).
