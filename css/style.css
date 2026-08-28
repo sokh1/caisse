@@ -275,6 +275,10 @@ tbody td {
   color: var(--text-muted);
 }
 
+.details-actions {
+  margin-top: 12px;
+}
+
 .cotisation-form .form-row {
   display: flex;
   flex-wrap: wrap;
@@ -367,6 +371,18 @@ tbody td {
   display: flex;
   gap: 8px;
   margin-top: 8px;
+}
+
+.modal-choice-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  margin: 14px 0;
+}
+
+.modal-choice-buttons .btn {
+  width: 100%;
+  padding: 12px 14px;
 }
 
 .page-wrap {
