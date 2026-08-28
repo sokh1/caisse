@@ -50,6 +50,11 @@ droite qui donne accès à :
 - **Configuration** — pour renseigner l'URL de votre Google Apps Script (voir
   ci-dessous).
 
+En haut à droite, un bouton **☀️/🌙** permet de basculer entre thème clair et
+thème sombre à tout moment (voir « Thème sombre » ci-dessous), et l'appli
+peut être **installée sur téléphone** comme une application (voir
+« Installer l'application sur un téléphone »).
+
 ## 1. Tester tout de suite (mode démo)
 
 Ouvrez simplement `index.html` dans votre navigateur (double-clic). L'appli
@@ -227,6 +232,43 @@ n'est envoyée à un serveur externe. Une connexion internet est nécessaire
 pour charger cette bibliothèque la première fois ; si elle ne peut pas se
 charger, un message d'erreur s'affiche au lieu de planter la page.
 
+### Thème sombre
+
+Le bouton **☀️/🌙** en haut à droite bascule instantanément entre thème clair
+et thème sombre. Le choix est mémorisé sur l'appareil (`localStorage`) et
+réappliqué à chaque ouverture ; si vous n'avez jamais touché au bouton,
+l'appli suit automatiquement le thème (clair ou sombre) déjà choisi dans les
+réglages de votre téléphone ou navigateur. L'impression (page Rapports) reste
+toujours en clair, quel que soit le thème affiché à l'écran, pour rester
+lisible sur papier.
+
+### Installer l'application sur un téléphone
+
+Une fois l'appli publiée sur GitHub Pages (ou tout autre hébergement HTTPS),
+elle peut être installée comme une application, avec sa propre icône sur
+l'écran d'accueil, et s'ouvre alors en plein écran (sans la barre d'adresse
+du navigateur) :
+
+- **Android (Chrome)** : ouvrez le lien de l'appli, appuyez sur le menu ⋮ en
+  haut à droite, puis **« Installer l'application »** (ou **« Ajouter à
+  l'écran d'accueil »**).
+- **iPhone / iPad (Safari)** : ouvrez le lien de l'appli, appuyez sur le
+  bouton de partage (le carré avec une flèche vers le haut), puis
+  **« Sur l'écran d'accueil »**.
+
+Une fois installée, l'appli se lance instantanément et l'écran d'accueil
+récent (mise en cache locale) reste consultable même sans connexion — mais
+une connexion internet reste nécessaire pour charger ou enregistrer des
+données dans la Google Sheet : seule l'« coquille » de l'application
+(l'interface elle-même) fonctionne hors-ligne, pas les données.
+
+> ℹ️ Si vous mettez à jour les fichiers de l'application (nouvelle version
+> déployée sur GitHub Pages), les appareils qui l'ont déjà installée
+> récupèrent automatiquement la nouvelle version au prochain lancement avec
+> connexion (le service worker vérifie toujours le réseau en priorité) — un
+> simple rechargement de la page suffit aussi si l'appli est ouverte dans un
+> onglet de navigateur classique.
+
 ### Pièces jointes (décès / dépenses / documents)
 
 Quand une pièce jointe est ajoutée depuis l'appli, le script la dépose dans un
@@ -246,7 +288,10 @@ dossier Google Drive nommé **« Caisse - Pieces jointes »**, créé automatiqu
 
 ```
 index.html            page principale
-css/style.css          mise en forme
+manifest.json           déclaration PWA (installation sur téléphone)
+sw.js                    service worker (installation + coquille hors-ligne)
+icons/                   icônes de l'application (PWA / écran d'accueil)
+css/style.css          mise en forme (thèmes clair et sombre)
 js/api.js               accès aux données (Google Sheets ou mode démo)
 js/app.js                logique de l'interface
 apps-script/Code.gs       script à coller dans Google Apps Script
