@@ -68,10 +68,44 @@ function isArchived(a) {
 }
 
 /* ---------------------------------------------------------------------- */
+/* Thème clair / sombre                                                    */
+/* ---------------------------------------------------------------------- */
+/* Le thème initial est déjà posé sur <html data-theme="..."> par le script
+   inline dans <head> (avant le chargement du CSS, pour éviter un flash).
+   Ici on se contente de refléter cet état sur le bouton et de gérer le clic. */
+
+const THEME_KEY = 'caisse.theme';
+
+function getTheme() {
+  return document.documentElement.getAttribute('data-theme') === 'dark' ? 'dark' : 'light';
+}
+
+function applyTheme(theme) {
+  document.documentElement.setAttribute('data-theme', theme);
+  try { localStorage.setItem(THEME_KEY, theme); } catch (e) { /* stockage indisponible : on ignore */ }
+  const btn = $('btn-theme-toggle');
+  if (btn) btn.setAttribute('aria-pressed', theme === 'dark' ? 'true' : 'false');
+  const meta = $('meta-theme-color');
+  if (meta) meta.setAttribute('content', theme === 'dark' ? '#141a15' : '#2f6f4f');
+}
+
+function toggleTheme() {
+  applyTheme(getTheme() === 'dark' ? 'light' : 'dark');
+}
+
+function initTheme() {
+  applyTheme(getTheme());
+  const btn = $('btn-theme-toggle');
+  if (btn) btn.addEventListener('click', toggleTheme);
+}
+
+/* ---------------------------------------------------------------------- */
 /* Chargement des données                                                  */
 /* ---------------------------------------------------------------------- */
 
 async function loadAll(preserveSelection) {
+  const loadingEl = $('app-loading');
+  if (loadingEl) loadingEl.classList.remove('hidden');
   try {
     const { adherents, cotisations, deces, depenses, documents, archives } = await Api.getAll();
     state.adherents = adherents;
@@ -95,6 +129,8 @@ async function loadAll(preserveSelection) {
     renderArchivedAdherents();
   } catch (err) {
     showToast('Erreur de chargement : ' + err.message, true);
+  } finally {
+    if (loadingEl) loadingEl.classList.add('hidden');
   }
 }
 
@@ -1204,6 +1240,8 @@ async function handleCotisationSubmit(evt) {
 /* ---------------------------------------------------------------------- */
 
 function init() {
+  initTheme();
+
   $('search-input').addEventListener('input', renderAdherentsTable);
 
   $('btn-new').addEventListener('click', () => openAdherentModal(null));
