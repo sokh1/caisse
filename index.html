@@ -99,6 +99,9 @@
                 <div><span class="info-label">Date d'adhésion</span><span id="d-date-adhesion"></span></div>
                 <div><span class="info-label">Total cotisé</span><span id="d-total-cotise"></span></div>
               </div>
+              <div class="details-actions no-print">
+                <button type="button" id="btn-pdf-adherent" class="btn btn-secondary btn-sm">📄 État PDF</button>
+              </div>
             </div>
 
             <h3>Cotisations</h3>
@@ -347,6 +350,21 @@
 
 </main>
 
+<!-- Modale : choix de ce qu'on veut modifier -->
+<div id="edit-choice-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>Que souhaitez-vous modifier ?</h2>
+    <p class="modal-help">Pour <strong id="edit-choice-name"></strong> :</p>
+    <div class="modal-choice-buttons">
+      <button type="button" id="edit-choice-infos" class="btn">Infos personnelles</button>
+      <button type="button" id="edit-choice-cotisation" class="btn btn-secondary">Cotisations (ajouter / modifier)</button>
+    </div>
+    <div class="modal-buttons">
+      <button type="button" id="edit-choice-cancel" class="btn btn-secondary">Annuler</button>
+    </div>
+  </div>
+</div>
+
 <!-- Modale : créer / modifier un adhérent -->
 <div id="adherent-modal" class="modal-overlay hidden">
   <div class="modal">
@@ -373,6 +391,8 @@
           <option value="GASSAMA">
           <option value="TAMOURA">
           <option value="KORERA">
+          <option value="DIARRA">
+          <option value="NDIAYE">
         </datalist>
       </label>
       <label>Prénom *
@@ -512,6 +532,7 @@
 
 <div id="toast" class="toast hidden"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="js/api.js"></script>
 <script src="js/app.js"></script>
 </body>

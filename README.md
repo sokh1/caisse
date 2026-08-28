@@ -18,12 +18,21 @@ L'appli est organisée en une seule page, avec un bouton **☰ Menu** en haut à
 droite qui donne accès à :
 
 - **Adhérents** — la vue par défaut : liste, recherche, fiche adhérent et
-  tableau de bord des cotisations (total par année). Un adhérent peut être
+  tableau de bord des cotisations (total par année). Le bouton **Modifier**
+  propose désormais un choix : **Infos personnelles** (nom, prénom,
+  téléphone…) ou **Cotisations** (amène directement au formulaire de
+  cotisations de la fiche, qui permet aussi bien d'en ajouter une nouvelle
+  que de modifier ou supprimer une cotisation existante depuis le tableau).
+  Un adhérent peut être
   **archivé** (bouton à côté de « Supprimer ») : il disparaît de la liste
   active, mais ses cotisations restent comptabilisées dans le total cotisé et
   le bilan par année — contrairement à « Supprimer », qui efface aussi ses
-  cotisations. Un second tableau de bord en bas de page liste les adhérents
-  archivés (avec leur total cotisé) et permet de les réactiver.
+  cotisations. Sur la fiche adhérent, le bouton **« 📄 État PDF »** génère un
+  PDF (infos + historique des cotisations) qui s'ouvre dans un nouvel onglet
+  pour être consulté, imprimé ou téléchargé depuis la visionneuse du
+  navigateur.
+- **Adhérents archivés** (dans le menu) — liste les adhérents archivés (avec
+  leur total cotisé) et permet de les réactiver.
 - **Déclarations — Décès et dépenses** — déclarer un décès (nom, prénom,
   coût des funérailles, date, pièce jointe) ou une dépense (date, nature,
   montant, pièce jointe).
@@ -206,6 +215,17 @@ lisibles).
 - Tout se gère dans Google Sheets : ajout, modification ou suppression de
   lignes ou de colonnes. L'application se contente d'afficher le contenu à
   jour à chaque rechargement de la page Archives.
+
+### État PDF d'un adhérent
+
+Le bouton **« 📄 État PDF »** de la fiche adhérent utilise la bibliothèque
+[jsPDF](https://github.com/parallax/jsPDF), chargée depuis un CDN
+(`cdnjs.cloudflare.com`) directement dans `index.html`. Le PDF (civilité, nom,
+prénom, téléphone, email, date d'adhésion, total cotisé et historique complet
+des cotisations) est généré entièrement dans le navigateur — aucune donnée
+n'est envoyée à un serveur externe. Une connexion internet est nécessaire
+pour charger cette bibliothèque la première fois ; si elle ne peut pas se
+charger, un message d'erreur s'affiche au lieu de planter la page.
 
 ### Pièces jointes (décès / dépenses / documents)
 
