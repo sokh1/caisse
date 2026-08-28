@@ -299,6 +299,110 @@ async function confirmDeleteCotisation(c) {
 }
 
 /* ---------------------------------------------------------------------- */
+/* État PDF d'un adhérent                                                   */
+/* ---------------------------------------------------------------------- */
+
+const ACCENT_MARKS_RE = new RegExp('[̀-ͯ]', 'g');
+
+function pdfFileNameFor(a) {
+  const raw = `etat-${a.Nom || 'adherent'}-${a.Prenom || ''}`.trim();
+  return raw
+    .toLowerCase()
+    .normalize('NFD').replace(ACCENT_MARKS_RE, '') // enlève les accents
+    .replace(/[^a-z0-9]+/g, '-')
+    .replace(/^-+|-+$/g, '') + '.pdf';
+}
+
+function generateAdherentPdf(a) {
+  if (!window.jspdf || !window.jspdf.jsPDF) {
+    showToast('Le générateur de PDF n\'a pas pu se charger (vérifiez votre connexion internet).', true);
+    return;
+  }
+
+  const { jsPDF } = window.jspdf;
+  const doc = new jsPDF();
+  const marginLeft = 14;
+  const pageBottom = 280;
+  let y = 20;
+
+  const cots = state.cotisations
+    .filter(c => c.AdherentID === a.ID)
+    .sort((x, y2) => (y2.Date || '').localeCompare(x.Date || ''));
+  const total = cots.reduce((s, c) => s + Number(c.Montant || 0), 0);
+
+  doc.setFontSize(16);
+  doc.text('Caisse — État de l\'adhérent', marginLeft, y);
+  y += 8;
+  doc.setFontSize(9);
+  doc.setTextColor(110, 110, 110);
+  doc.text(`Édité le ${formatDate(new Date().toISOString().slice(0, 10))}`, marginLeft, y);
+  doc.setTextColor(0, 0, 0);
+  y += 12;
+
+  doc.setFontSize(13);
+  doc.text(`${a.Civilite ? a.Civilite + ' ' : ''}${adherentName(a)}`.trim(), marginLeft, y);
+  y += 8;
+
+  doc.setFontSize(10);
+  const infoLines = [
+    `Téléphone : ${a.Telephone || '—'}`,
+    `Email : ${a.Email || '—'}`,
+    `Date d'adhésion : ${formatDate(a.DateAdhesion) || '—'}`,
+    `Total cotisé : ${formatMontant(total)}`
+  ];
+  for (const line of infoLines) {
+    doc.text(line, marginLeft, y);
+    y += 6;
+  }
+  y += 6;
+
+  doc.setFontSize(12);
+  doc.text('Historique des cotisations', marginLeft, y);
+  y += 8;
+
+  doc.setFontSize(10);
+  doc.setFont(undefined, 'bold');
+  doc.text('Date', marginLeft, y);
+  doc.text('Montant', marginLeft + 55, y);
+  doc.text('Statut', marginLeft + 105, y);
+  doc.setFont(undefined, 'normal');
+  y += 2;
+  doc.line(marginLeft, y, 196, y);
+  y += 6;
+
+  if (cots.length === 0) {
+    doc.text('Aucune cotisation enregistrée.', marginLeft, y);
+    y += 6;
+  } else {
+    for (const c of cots) {
+      if (y > pageBottom) {
+        doc.addPage();
+        y = 20;
+      }
+      doc.text(formatDate(c.Date) || '—', marginLeft, y);
+      doc.text(formatMontant(c.Montant), marginLeft + 55, y);
+      doc.text(STATUT_LABELS[c.Statut] || c.Statut || '', marginLeft + 105, y);
+      y += 6;
+    }
+  }
+
+  const fileName = pdfFileNameFor(a);
+
+  // Ouvre le PDF dans un nouvel onglet pour la visualisation (l'utilisateur
+  // peut ensuite le télécharger/imprimer depuis la visionneuse du navigateur).
+  // Si la fenêtre est bloquée par le navigateur, on télécharge directement à la place.
+  try {
+    const blobUrl = doc.output('bloburl');
+    const win = window.open(blobUrl, '_blank');
+    if (!win) {
+      doc.save(fileName);
+    }
+  } catch (err) {
+    doc.save(fileName);
+  }
+}
+
+/* ---------------------------------------------------------------------- */
 /* Adhérents archivés                                                      */
 /* ---------------------------------------------------------------------- */
 
@@ -999,6 +1103,33 @@ async function handleAdherentSubmit(evt) {
 }
 
 /* ---------------------------------------------------------------------- */
+/* Modale de choix : que veut-on modifier ? (infos ou cotisations)         */
+/* ---------------------------------------------------------------------- */
+
+function openEditChoiceModal(a) {
+  $('edit-choice-name').textContent = adherentName(a);
+  $('edit-choice-modal').classList.remove('hidden');
+}
+
+function closeEditChoiceModal() {
+  $('edit-choice-modal').classList.add('hidden');
+}
+
+// Amène l'utilisateur directement sur le formulaire de cotisations de la
+// fiche adhérent (déjà capable d'ajouter une nouvelle cotisation ou d'en
+// modifier une existante via les boutons de chaque ligne du tableau).
+function focusCotisationForm() {
+  const form = $('cotisation-form');
+  if (form && form.scrollIntoView) {
+    form.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+  setTimeout(() => {
+    const montant = $('cot-montant');
+    if (montant) montant.focus();
+  }, 350);
+}
+
+/* ---------------------------------------------------------------------- */
 /* Modale de confirmation générique                                        */
 /* ---------------------------------------------------------------------- */
 
@@ -1078,8 +1209,18 @@ function init() {
   $('btn-new').addEventListener('click', () => openAdherentModal(null));
   $('btn-edit').addEventListener('click', () => {
     const a = currentAdherent();
+    if (a) openEditChoiceModal(a);
+  });
+  $('edit-choice-infos').addEventListener('click', () => {
+    const a = currentAdherent();
+    closeEditChoiceModal();
     if (a) openAdherentModal(a);
   });
+  $('edit-choice-cotisation').addEventListener('click', () => {
+    closeEditChoiceModal();
+    focusCotisationForm();
+  });
+  $('edit-choice-cancel').addEventListener('click', closeEditChoiceModal);
   $('btn-delete').addEventListener('click', () => {
     const a = currentAdherent();
     if (!a) return;
@@ -1131,6 +1272,11 @@ function init() {
 
   $('cotisation-form').addEventListener('submit', handleCotisationSubmit);
   $('cot-cancel-btn').addEventListener('click', cancelCotisationEdit);
+
+  $('btn-pdf-adherent').addEventListener('click', () => {
+    const a = currentAdherent();
+    if (a) generateAdherentPdf(a);
+  });
 
   $('btn-new-deces').addEventListener('click', () => openDecesModal(null));
   $('deces-form').addEventListener('submit', handleDecesSubmit);
