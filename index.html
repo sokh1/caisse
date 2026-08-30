@@ -34,6 +34,48 @@
 </head>
 <body>
 
+<!-- Écran de connexion (affiché tant qu'aucune session valide n'est active) -->
+<div id="login-screen" class="login-screen hidden">
+  <form id="login-form" class="login-card">
+    <h1 class="login-title">Caisse</h1>
+    <p class="login-subtitle">Gestion des adhérents — connexion requise</p>
+    <label>Nom d'utilisateur
+      <input type="text" id="login-username" autocomplete="username" required>
+    </label>
+    <label>Mot de passe
+      <input type="password" id="login-password" autocomplete="current-password" required>
+    </label>
+    <p id="login-error" class="login-error hidden"></p>
+    <button type="submit" class="btn login-submit">Se connecter</button>
+    <p id="login-demo-hint" class="login-demo-hint hidden">
+      Mode démo — comptes de test : <strong>admin / admin123</strong> (Administrateur),
+      <strong>consultation / consultation123</strong> (Consultation),
+      <strong>restreint / restreint123</strong> (Consultation, adhérents affectés uniquement).
+    </p>
+  </form>
+</div>
+
+<!-- Modale : changement de mot de passe obligatoire (après une réinitialisation) -->
+<div id="force-password-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>Nouveau mot de passe requis</h2>
+    <p class="modal-help">Votre mot de passe a été réinitialisé. Choisissez-en un nouveau pour continuer.</p>
+    <form id="force-password-form">
+      <label>Mot de passe temporaire actuel *
+        <input type="password" id="fp-ancien" autocomplete="current-password" required>
+      </label>
+      <label>Nouveau mot de passe (6 caractères min.) *
+        <input type="password" id="fp-nouveau" autocomplete="new-password" required minlength="6">
+      </label>
+      <div class="modal-buttons">
+        <button type="submit" class="btn">Enregistrer le nouveau mot de passe</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<div id="app-shell" class="hidden">
+
 <header class="topbar">
   <h1>Caisse — Gestion des adhérents</h1>
   <div class="topbar-actions">
@@ -43,15 +85,28 @@
       <span class="theme-icon theme-icon-dark" aria-hidden="true">🌙</span>
     </button>
     <div class="menu-wrap">
+      <button id="btn-notifications" class="icon-btn btn-notifications" type="button" aria-haspopup="true" aria-expanded="false" title="Notifications">
+        🔔<span id="notif-badge" class="notif-badge hidden">0</span>
+      </button>
+      <div id="notif-dropdown" class="main-menu notif-dropdown hidden">
+        <div class="notif-dropdown-header">Notifications</div>
+        <div id="notif-list" class="notif-list"></div>
+        <p id="notif-empty" class="empty-msg hidden">Aucune notification récente.</p>
+      </div>
+    </div>
+    <div class="menu-wrap">
       <button id="btn-menu" class="icon-btn" aria-haspopup="true" aria-expanded="false">☰ Menu</button>
       <nav id="main-menu" class="main-menu hidden">
         <button type="button" class="menu-item active" data-view="adherents">Adhérents</button>
         <button type="button" class="menu-item" data-view="adherents-archives">Adhérents archivés</button>
-        <button type="button" class="menu-item" data-view="declarations">Déclarations — Décès et dépenses</button>
-        <button type="button" class="menu-item" data-view="rapports">Rapports</button>
-        <button type="button" class="menu-item" data-view="documents">Documents</button>
-        <button type="button" class="menu-item" data-view="archives">Archives</button>
+        <button type="button" class="menu-item" data-view="declarations" id="menu-declarations">Déclarations — Décès et dépenses</button>
+        <button type="button" class="menu-item" data-view="rapports" id="menu-rapports">Rapports</button>
+        <button type="button" class="menu-item" data-view="documents" id="menu-documents">Documents</button>
+        <button type="button" class="menu-item" data-view="archives" id="menu-archives">Archives</button>
+        <button type="button" class="menu-item hidden" data-view="utilisateurs" id="menu-utilisateurs">Utilisateurs</button>
+        <button type="button" class="menu-item hidden" data-view="validation" id="menu-validation">Cotisations à valider</button>
         <button type="button" class="menu-item" id="menu-configuration">Configuration</button>
+        <button type="button" class="menu-item menu-item-logout" id="menu-logout">Déconnexion</button>
       </nav>
     </div>
   </div>
@@ -128,6 +183,8 @@
                 <div><span class="info-label">Email</span><span id="d-email"></span></div>
                 <div><span class="info-label">Date d'adhésion</span><span id="d-date-adhesion"></span></div>
                 <div><span class="info-label">Total cotisé</span><span id="d-total-cotise"></span></div>
+                <div><span class="info-label">Pièce jointe</span><span id="d-piece-jointe"></span></div>
+                <div id="d-utilisateur-affecte-wrap" class="hidden"><span class="info-label">Utilisateur affecté</span><span id="d-utilisateur-affecte"></span></div>
               </div>
               <div class="details-actions no-print">
                 <button type="button" id="btn-pdf-adherent" class="btn btn-secondary btn-sm">📄 État PDF</button>
@@ -164,13 +221,18 @@
             <div class="table-wrap table-wrap-flat">
               <table id="cotisations-table">
                 <thead>
-                  <tr><th>Date</th><th>Montant</th><th>Statut</th><th></th></tr>
+                  <tr><th>Date</th><th>Montant</th><th>Statut</th><th>Validation</th><th></th></tr>
                 </thead>
                 <tbody id="cotisations-tbody">
                 </tbody>
               </table>
             </div>
             <p id="empty-cotisations" class="empty-msg hidden">Aucune cotisation pour cet adhérent.</p>
+            <p class="modal-help">
+              Le « Total cotisé » ci-dessus ne compte que les cotisations validées. Une cotisation saisie
+              par un compte Collecteur apparaît « En attente » jusqu'à validation par un Administrateur
+              (page « Cotisations à valider »).
+            </p>
           </div>
         </div>
 
@@ -378,7 +440,91 @@
     </div>
   </section>
 
+  <!-- Vue : Utilisateurs (Administrateur uniquement) -->
+  <section id="view-utilisateurs" class="view hidden">
+    <div class="page-wrap">
+      <div class="page-header">
+        <h2>Utilisateurs</h2>
+        <button id="btn-new-utilisateur" class="btn">Nouvel utilisateur</button>
+      </div>
+      <p class="modal-help">
+        Un compte <strong>Administrateur</strong> a accès à tout, en lecture et en écriture. Un compte
+        <strong>Consultation</strong> est en lecture seule ; s'il est marqué « adhérents affectés
+        uniquement », il ne voit que les adhérents qui lui ont été affectés (dans la fiche de chaque
+        adhérent), et non l'ensemble des déclarations/rapports/documents de l'association. Un compte
+        <strong>Collecteur</strong> peut ajouter des cotisations pour ses adhérents affectés uniquement
+        (toujours, sans réglage) ; elles restent « en attente de validation » — sans compter dans les
+        totaux — jusqu'à ce qu'un Administrateur les valide depuis « Cotisations à valider ». Un compte
+        peut être <strong>local</strong> (identifiant choisi librement) ou <strong>lié à un adhérent</strong>
+        (identifiant généré automatiquement à partir de son nom).
+      </p>
+      <div class="panel">
+        <div class="table-wrap table-wrap-flat">
+          <table id="utilisateurs-table">
+            <thead>
+              <tr><th>Nom d'utilisateur</th><th>Nom complet</th><th>Rôle</th><th>Portée</th><th></th></tr>
+            </thead>
+            <tbody id="utilisateurs-tbody"></tbody>
+          </table>
+        </div>
+        <p id="empty-utilisateurs" class="empty-msg hidden">Aucun utilisateur.</p>
+      </div>
+    </div>
+  </section>
+
+  <!-- Vue : Cotisations à valider (Administrateur) -->
+  <section id="view-validation" class="view hidden">
+    <div class="page-wrap">
+      <h2>Cotisations à valider</h2>
+      <p class="modal-help">
+        Cotisations saisies par un compte Collecteur, en attente de validation. Elles ne comptent dans
+        aucun total tant qu'elles ne sont pas validées. Pour refuser une saisie erronée, supprimez-la
+        depuis la fiche de l'adhérent concerné plutôt que de la valider.
+      </p>
+      <div class="panel">
+        <div class="table-wrap table-wrap-flat">
+          <table id="validation-table">
+            <thead>
+              <tr><th>Adhérent</th><th>Date</th><th>Montant</th><th>Statut</th><th>Soumis par</th><th>Le</th><th></th></tr>
+            </thead>
+            <tbody id="validation-tbody"></tbody>
+          </table>
+        </div>
+        <p id="empty-validation" class="empty-msg hidden">Aucune cotisation en attente de validation.</p>
+      </div>
+    </div>
+  </section>
+
 </main>
+
+<!-- Barre de navigation mobile (bas d'écran) : sur téléphone, remplace
+     complètement le menu ☰ pour l'accès aux pages les plus utilisées ;
+     le dernier onglet « Menu » ouvre le menu complet (Adhérents archivés,
+     Déclarations, Rapports, Utilisateurs, Configuration, Déconnexion…). -->
+<nav id="mobile-tabbar" class="mobile-tabbar" aria-label="Navigation mobile">
+  <button type="button" class="mobile-tab-item active" data-view="adherents">
+    <span class="mobile-tab-icon" aria-hidden="true">👥</span>
+    <span class="mobile-tab-label">Adhérents</span>
+  </button>
+  <button type="button" class="mobile-tab-item hidden" data-view="validation" id="tab-validation">
+    <span class="mobile-tab-icon" aria-hidden="true">✅</span>
+    <span class="mobile-tab-label">Valider</span>
+  </button>
+  <button type="button" class="mobile-tab-item" data-view="archives" id="tab-archives">
+    <span class="mobile-tab-icon" aria-hidden="true">🗄️</span>
+    <span class="mobile-tab-label">Archives</span>
+  </button>
+  <button type="button" class="mobile-tab-item" data-view="documents" id="tab-documents">
+    <span class="mobile-tab-icon" aria-hidden="true">📄</span>
+    <span class="mobile-tab-label">Document</span>
+  </button>
+  <button type="button" id="btn-mobile-menu" class="mobile-tab-item" aria-haspopup="true" aria-expanded="false">
+    <span class="mobile-tab-icon" aria-hidden="true">⋮</span>
+    <span class="mobile-tab-label">Menu</span>
+  </button>
+</nav>
+
+</div><!-- /#app-shell -->
 
 <!-- Modale : choix de ce qu'on veut modifier -->
 <div id="edit-choice-modal" class="modal-overlay hidden">
@@ -437,6 +583,15 @@
       <label>Date d'adhésion
         <input type="date" id="a-date-adhesion">
       </label>
+      <label id="a-utilisateur-affecte-wrap" class="hidden">Utilisateur affecté
+        <select id="a-utilisateur-affecte">
+          <option value="">Aucun</option>
+        </select>
+      </label>
+      <label>Pièce jointe (facultatif)
+        <input type="file" id="a-fichier">
+      </label>
+      <p id="a-fichier-actuel" class="modal-help hidden"></p>
       <div class="modal-buttons">
         <button type="submit" class="btn">Enregistrer</button>
         <button type="button" id="adherent-modal-cancel" class="btn btn-secondary">Annuler</button>
@@ -541,21 +696,119 @@
   </div>
 </div>
 
-<!-- Modale : configuration de la source de données -->
+<!-- Modale : configuration -->
 <div id="settings-modal" class="modal-overlay hidden">
-  <div class="modal">
-    <h2>Configuration de la source de données</h2>
-    <p class="modal-help">
-      Collez ici l'URL de votre application web Google Apps Script (voir README.md pour
-      la procédure de déploiement). Laissez vide pour utiliser le mode démo (données
-      en mémoire, non sauvegardées).
-    </p>
-    <label>URL de l'application web Apps Script
-      <input type="url" id="settings-url" placeholder="https://script.google.com/macros/s/…/exec">
-    </label>
+  <div class="modal modal-wide">
+    <h2>Configuration</h2>
+
+    <div id="settings-admin-section">
+      <h3>Source de données</h3>
+      <p class="modal-help">
+        Collez ici l'URL de votre application web Google Apps Script (voir README.md pour
+        la procédure de déploiement). Laissez vide pour utiliser le mode démo (données
+        en mémoire, non sauvegardées).
+      </p>
+      <label>URL de l'application web Apps Script
+        <input type="url" id="settings-url" placeholder="https://script.google.com/macros/s/…/exec">
+      </label>
+
+      <h3>Stockage des pièces jointes</h3>
+      <p class="modal-help">
+        Lien d'un dossier Google Drive dans lequel ranger les pièces jointes (sous-dossiers
+        Adherents / Deces / Depenses / Documents créés automatiquement dedans). Laissez vide pour
+        utiliser le dossier créé automatiquement à côté de la feuille de calcul.
+      </p>
+      <label>Lien du dossier Google Drive
+        <input type="url" id="settings-drive-url" placeholder="https://drive.google.com/drive/folders/…">
+      </label>
+
+      <h3>Notifications</h3>
+      <p class="modal-help">Durée pendant laquelle un nouvel adhérent, décès ou dépense apparaît dans la cloche de notifications.</p>
+      <label>Durée des notifications (en jours)
+        <input type="number" id="settings-notif-duree" min="1" step="1">
+      </label>
+
+      <div class="modal-buttons">
+        <button id="settings-save" class="btn">Enregistrer</button>
+      </div>
+    </div>
+
+    <h3>Mon mot de passe</h3>
+    <form id="change-password-form">
+      <label>Mot de passe actuel *
+        <input type="password" id="cp-ancien" autocomplete="current-password" required>
+      </label>
+      <label>Nouveau mot de passe (6 caractères min.) *
+        <input type="password" id="cp-nouveau" autocomplete="new-password" required minlength="6">
+      </label>
+      <div class="modal-buttons">
+        <button type="submit" class="btn btn-secondary">Changer mon mot de passe</button>
+      </div>
+    </form>
+
     <div class="modal-buttons">
-      <button id="settings-save" class="btn">Enregistrer</button>
-      <button id="settings-cancel" class="btn btn-secondary">Annuler</button>
+      <button id="settings-cancel" class="btn btn-secondary">Fermer</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modale : créer / modifier un utilisateur -->
+<div id="utilisateur-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2 id="utilisateur-modal-title">Nouvel utilisateur</h2>
+    <form id="utilisateur-form">
+      <input type="hidden" id="u-id">
+
+      <div id="u-type-compte-wrap" class="radio-row">
+        <label class="checkbox-label"><input type="radio" name="u-type-compte" id="u-type-local" value="local" checked> Compte local</label>
+        <label class="checkbox-label"><input type="radio" name="u-type-compte" id="u-type-adherent" value="adherent"> Lié à un adhérent</label>
+      </div>
+
+      <label id="u-adherent-lie-wrap" class="hidden">Adhérent *
+        <select id="u-adherent-lie"></select>
+      </label>
+
+      <label>Nom d'utilisateur *
+        <input type="text" id="u-nom-utilisateur" autocomplete="off" required>
+      </label>
+      <p id="u-nom-utilisateur-help" class="modal-help hidden">Identifiant généré automatiquement à partir du nom de l'adhérent choisi (modifiable si besoin).</p>
+      <label>Nom complet
+        <input type="text" id="u-nom-complet" autocomplete="off">
+      </label>
+      <label id="u-mot-de-passe-wrap">Mot de passe (6 caractères min.) *
+        <input type="password" id="u-mot-de-passe" autocomplete="new-password" minlength="6">
+      </label>
+      <label>Rôle *
+        <select id="u-role" required>
+          <option value="Consultation">Consultation (lecture seule)</option>
+          <option value="Collecteur">Collecteur (ajoute des cotisations, en attente de validation)</option>
+          <option value="Administrateur">Administrateur (lecture et écriture)</option>
+        </select>
+      </label>
+      <label id="u-restreint-wrap" class="checkbox-label">
+        <input type="checkbox" id="u-restreint">
+        Voir uniquement les adhérents qui lui sont affectés (comptes Consultation)
+      </label>
+      <p id="u-collecteur-help" class="modal-help hidden">
+        Un compte Collecteur ne voit et ne peut saisir des cotisations que pour les adhérents qui lui
+        sont affectés (dans la fiche de chaque adhérent) — toujours, sans réglage.
+      </p>
+      <div class="modal-buttons">
+        <button type="submit" class="btn">Enregistrer</button>
+        <button type="button" id="utilisateur-modal-cancel" class="btn btn-secondary">Annuler</button>
+      </div>
+    </form>
+  </div>
+</div>
+
+<!-- Modale : résultat d'une réinitialisation de mot de passe -->
+<div id="reset-password-result-modal" class="modal-overlay hidden">
+  <div class="modal">
+    <h2>Mot de passe réinitialisé</h2>
+    <p class="modal-help">Communiquez ce mot de passe temporaire à l'utilisateur — il devra en choisir un nouveau à sa prochaine connexion.</p>
+    <p class="temp-password-display" id="reset-password-value"></p>
+    <div class="modal-buttons">
+      <button id="reset-password-close" class="btn">Fermer</button>
     </div>
   </div>
 </div>
