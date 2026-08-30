@@ -27,6 +27,15 @@
   --btn-secondary-hover: #d5d8dd;
   --btn-disabled-bg: #b9c0c9;
 
+  --info-bg: #e7eefc;
+  --info-text: #2b559e;
+  --info-border: #bcd0f2;
+
+  --tabbar-bg: #101a2c;
+  --tabbar-border: #1c2740;
+  --tabbar-icon: #8996b3;
+  --tabbar-active: #4caf7d;
+
   color-scheme: light;
 }
 
@@ -57,6 +66,15 @@
   --btn-secondary-bg: #2a3137;
   --btn-secondary-hover: #333c43;
   --btn-disabled-bg: #3a4148;
+
+  --info-bg: #1c2a3f;
+  --info-text: #7fb0f2;
+  --info-border: #2f4566;
+
+  --tabbar-bg: #101418;
+  --tabbar-border: #2a3137;
+  --tabbar-icon: #8b95a0;
+  --tabbar-active: #5fc492;
 
   color-scheme: dark;
 }
@@ -171,6 +189,11 @@ body {
 .menu-item:last-child { border-bottom: none; }
 .menu-item:hover { background: var(--row-hover); }
 .menu-item.active { background: var(--row-selected); font-weight: 600; }
+
+/* Barre de navigation mobile (bas d'écran) : masquée par défaut, activée
+   uniquement sous 640px (voir media query dédiée plus bas), où elle
+   remplace complètement le déclencheur ☰ du menu principal. */
+.mobile-tabbar { display: none; }
 
 .layout {
   display: grid;
@@ -767,6 +790,79 @@ tbody td {
   }
 }
 
+@media (max-width: 640px) {
+  /* Sur téléphone, la barre du bas remplace entièrement le déclencheur ☰
+     (qui reste, lui, le seul point d'entrée du menu sur tablette/bureau). */
+  #btn-menu { display: none; }
+
+  main, .page-wrap {
+    padding-bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+  }
+
+  .mobile-tabbar {
+    display: flex;
+    position: fixed;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    z-index: 70;
+    background: var(--tabbar-bg);
+    border-top: 1px solid var(--tabbar-border);
+    padding: 6px 2px calc(6px + env(safe-area-inset-bottom, 0px));
+    box-shadow: 0 -4px 16px var(--menu-shadow);
+  }
+
+  .mobile-tab-item {
+    flex: 1 1 0;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 2px;
+    min-width: 0;
+    background: none;
+    border: none;
+    padding: 6px 2px;
+    color: var(--tabbar-icon);
+    font-family: inherit;
+    cursor: pointer;
+    transition: color 0.12s ease;
+  }
+
+  .mobile-tab-item.active { color: var(--tabbar-active); }
+  .mobile-tab-item.hidden { display: none; }
+
+  .mobile-tab-icon {
+    font-size: 1.25rem;
+    line-height: 1;
+  }
+
+  .mobile-tab-label {
+    font-size: 0.68rem;
+    max-width: 100%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+
+  /* Le menu principal (#main-menu) est désormais ouvert depuis l'onglet
+     « Menu » de la barre du bas plutôt que depuis ☰ : repositionné en
+     feuille ancrée juste au-dessus de la barre plutôt qu'en dropdown
+     ancré au bouton (masqué) qui l'ouvrait auparavant. */
+  #main-menu {
+    position: fixed;
+    top: auto;
+    left: 8px;
+    right: 8px;
+    bottom: calc(70px + env(safe-area-inset-bottom, 0px));
+    width: auto;
+    min-width: 0;
+    max-height: 60vh;
+    overflow-y: auto;
+    transform-origin: bottom center;
+  }
+}
+
 .toast {
   position: fixed;
   bottom: 20px;
@@ -836,6 +932,256 @@ tbody td {
 }
 
 /* ------------------------------------------------------------------ */
+/* Écran de connexion                                                   */
+/* ------------------------------------------------------------------ */
+
+.login-screen {
+  position: fixed;
+  inset: 0;
+  z-index: 300;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: var(--bg);
+  padding: 20px;
+}
+
+.login-card {
+  background: var(--panel-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 28px 26px;
+  width: min(380px, 100%);
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  box-shadow: 0 12px 32px var(--menu-shadow);
+  animation: modal-pop 0.2s ease;
+}
+
+.login-title {
+  margin: 0;
+  font-size: 1.6rem;
+  color: var(--accent);
+  text-align: center;
+}
+
+.login-subtitle {
+  margin: 0 0 8px 0;
+  text-align: center;
+  color: var(--text-muted);
+  font-size: 0.9rem;
+}
+
+.login-card label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  font-size: 0.85rem;
+}
+
+.login-card input {
+  padding: 9px 11px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  font-size: 0.95rem;
+}
+
+.login-submit {
+  margin-top: 4px;
+  padding: 10px;
+}
+
+.login-error {
+  color: var(--danger);
+  font-size: 0.85rem;
+  margin: 0;
+}
+
+.login-demo-hint {
+  margin: 10px 0 0 0;
+  font-size: 0.78rem;
+  color: var(--text-muted);
+  line-height: 1.5;
+  border-top: 1px solid var(--border);
+  padding-top: 10px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Notifications                                                        */
+/* ------------------------------------------------------------------ */
+
+.btn-notifications {
+  position: relative;
+}
+
+.notif-badge {
+  position: absolute;
+  top: -4px;
+  right: -4px;
+  background: var(--danger);
+  color: #fff;
+  font-size: 0.65rem;
+  font-weight: 700;
+  min-width: 16px;
+  height: 16px;
+  padding: 0 3px;
+  border-radius: 999px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  line-height: 1;
+}
+
+.notif-dropdown {
+  width: min(360px, 90vw);
+  min-width: 0;
+  padding: 0;
+}
+
+.notif-dropdown-header {
+  padding: 12px 14px;
+  font-weight: 600;
+  font-size: 0.9rem;
+  border-bottom: 1px solid var(--menu-item-border);
+}
+
+.notif-list {
+  max-height: 340px;
+  overflow-y: auto;
+}
+
+.notif-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 10px;
+  width: 100%;
+  text-align: left;
+  padding: 10px 14px;
+  border: none;
+  border-bottom: 1px solid var(--menu-item-border);
+  background: none;
+  cursor: pointer;
+  font-size: 0.85rem;
+  color: var(--text);
+  transition: background-color 0.12s ease;
+}
+
+.notif-item:last-child { border-bottom: none; }
+.notif-item:hover { background: var(--row-hover); }
+.notif-item-unread { background: var(--row-selected); }
+
+.notif-item-icon {
+  font-size: 1.1rem;
+  line-height: 1.3;
+}
+
+.notif-item-body {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.notif-item-label { font-weight: 500; }
+
+.notif-item-date {
+  font-size: 0.75rem;
+  color: var(--text-muted);
+}
+
+.notif-dropdown .empty-msg {
+  padding: 18px 14px;
+}
+
+/* ------------------------------------------------------------------ */
+/* Utilisateurs / configuration avancée                                 */
+/* ------------------------------------------------------------------ */
+
+.checkbox-label {
+  flex-direction: row !important;
+  align-items: center;
+  gap: 8px !important;
+}
+
+.checkbox-label input[type="checkbox"] {
+  width: auto;
+}
+
+.modal-wide {
+  width: min(520px, 92vw);
+}
+
+.temp-password-display {
+  font-family: "Courier New", monospace;
+  font-size: 1.3rem;
+  font-weight: 700;
+  letter-spacing: 1px;
+  background: var(--stat-card-bg);
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  padding: 12px;
+  text-align: center;
+  user-select: all;
+}
+
+.role-badge {
+  font-size: 0.75rem;
+  padding: 3px 9px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.role-badge-admin {
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  border: 1px solid var(--badge-border);
+}
+
+.role-badge-consultation {
+  background: var(--row-selected);
+  color: var(--accent);
+  border: 1px solid var(--border);
+}
+
+.role-badge-collecteur {
+  background: var(--info-bg);
+  color: var(--info-text);
+  border: 1px solid var(--info-border);
+}
+
+.status-badge {
+  font-size: 0.75rem;
+  padding: 2px 8px;
+  border-radius: 999px;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.status-badge-attente {
+  background: var(--badge-bg);
+  color: var(--badge-text);
+  border: 1px solid var(--badge-border);
+}
+
+.radio-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+  margin-bottom: 4px;
+}
+
+.radio-row .checkbox-label {
+  margin: 0;
+}
+
+@media (max-width: 640px) {
+  .login-card { padding: 22px 18px; }
+  .notif-dropdown { width: min(320px, 90vw); }
+}
+
+/* ------------------------------------------------------------------ */
 /* Impression (page Rapports)                                          */
 /* ------------------------------------------------------------------ */
 
@@ -845,7 +1191,7 @@ tbody td {
     animation: none !important;
   }
 
-  .topbar, .no-print, .modal-overlay, .toast, .app-loading {
+  .topbar, .no-print, .modal-overlay, .toast, .app-loading, .login-screen, .mobile-tabbar {
     display: none !important;
   }
 
