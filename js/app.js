@@ -144,7 +144,16 @@ async function loadAll(preserveSelection) {
     state.deces = data.deces || [];
     state.depenses = data.depenses || [];
     state.documents = data.documents || [];
-    state.archives = data.archives || { headers: [], rows: [] };
+    // data.archives vaut `null` quand le serveur ne l'a délibérément pas
+    // relu cette fois-ci (voir Code.gs, buildAppState_ — Archives n'est
+    // désormais chargé qu'à la demande, à l'ouverture de cette page précise,
+    // voir showView() plus bas) : on garde alors la dernière copie déjà en
+    // mémoire plutôt que d'effacer l'affichage. `undefined` (mode démo, qui
+    // renvoie toujours une vraie valeur ceci dit) retombe sur le même défaut
+    // qu'avant.
+    if (data.archives !== null && data.archives !== undefined) {
+      state.archives = data.archives;
+    }
     state.utilisateurs = data.utilisateurs || [];
     state.notifications = data.notifications || { count: 0, items: [] };
     state.config = data.config || {};
@@ -389,6 +398,9 @@ function showView(viewName) {
   });
   state.currentView = viewName;
   closeMainMenu();
+  if (viewName === 'archives') {
+    refreshArchives();
+  }
 }
 
 function openMainMenu() {
@@ -1240,6 +1252,29 @@ async function handleDocumentSubmit(evt) {
 /* ---------------------------------------------------------------------- */
 /* Archives (lecture seule, onglet Google Sheet dédié)                     */
 /* ---------------------------------------------------------------------- */
+
+// Archives n'est plus chargé automatiquement avec le reste des données (voir
+// loadAll() ci-dessus et Code.gs, buildAppState_) : cette fonction va le
+// chercher à part, à chaque ouverture de la page (showView('archives')), ce
+// qui garantit au passage une copie toujours fraîche (l'onglet est modifié
+// directement dans Google Sheets par l'utilisateur, en dehors de l'appli).
+async function refreshArchives() {
+  const loadingEl = $('app-loading');
+  if (loadingEl) loadingEl.classList.remove('hidden');
+  try {
+    const archives = await Api.getArchives();
+    state.archives = archives || { headers: [], rows: [] };
+    renderArchives();
+  } catch (err) {
+    if (err.authRequired) {
+      showLoginScreen();
+    } else {
+      showToast('Erreur de chargement des archives : ' + err.message, true);
+    }
+  } finally {
+    if (loadingEl) loadingEl.classList.add('hidden');
+  }
+}
 
 const ARCHIVES_MAX_DISTINCT_VALUES = 40;
 

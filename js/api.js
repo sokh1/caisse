@@ -261,6 +261,16 @@ const Api = (() => {
   /* API Apps Script (fetch)                                          */
   /* ---------------------------------------------------------------- */
 
+  // Rempli par remotePost() quand la réponse d'une action d'écriture contient
+  // déjà l'état complet à jour (voir Code.gs, doPost) : evite à getAll() de
+  // refaire un second aller-retour réseau (doGet) juste après une connexion
+  // ou une modification, alors que le serveur vient de le renvoyer dans la
+  // même réponse. Consommé une seule fois (voir getAll() plus bas), ce qui
+  // correspond exactement au schéma d'utilisation de ce fichier : chaque
+  // appel d'écriture est systématiquement suivi d'un seul rafraîchissement
+  // (loadAll() dans app.js), jamais de plusieurs à la suite.
+  let lastFreshState = null;
+
   async function remoteGetAll() {
     const sep = getApiUrl().includes('?') ? '&' : '?';
     const res = await fetch(getApiUrl() + sep + 'token=' + encodeURIComponent(getToken()), { method: 'GET' });
@@ -292,6 +302,7 @@ const Api = (() => {
       err.authRequired = !!json.authRequired;
       throw err;
     }
+    if (json.state) lastFreshState = json.state;
     return json.data;
   }
 
@@ -347,6 +358,20 @@ const Api = (() => {
       return { ok: true };
     }
     return remotePost('markNotificationsVues', {});
+  }
+
+  // L'onglet Archives n'est plus renvoyé automatiquement à chaque connexion
+  // ou modification (voir Code.gs, buildAppState_) — il est demandé à part,
+  // seulement à l'ouverture de la page Archives (voir js/app.js, showView()).
+  // En mode démo, filterDemoForUser calcule déjà tout instantanément (pas de
+  // vrai coût réseau à économiser) : on réutilise donc simplement son résultat.
+  async function getArchives() {
+    if (isDemoMode()) {
+      const user = currentDemoUser();
+      if (!user) throw authRequiredError();
+      return filterDemoForUser(user).archives;
+    }
+    return remotePost('getArchives', {});
   }
 
   /* ---------------------------------------------------------------- */
@@ -476,6 +501,16 @@ const Api = (() => {
         result.config.dossierDriveUrl = demoConfig.DossierDriveUrl;
       }
       return result;
+    }
+    // Une action d'écriture qui vient de se terminer (via remotePost) a déjà
+    // reçu l'état complet et à jour dans sa propre réponse — inutile de
+    // refaire un appel réseau séparé rien que pour le récupérer une seconde
+    // fois. Ne s'applique qu'une fois : le prochain getAll() sans écriture
+    // préalable repart normalement sur un vrai appel réseau.
+    if (lastFreshState) {
+      const state = lastFreshState;
+      lastFreshState = null;
+      return state;
     }
     return remoteGetAll();
   }
@@ -723,7 +758,7 @@ const Api = (() => {
 
   return {
     getApiUrl, setApiUrl, isDemoMode, getAll,
-    login, logout, changePassword, markNotificationsVues,
+    login, logout, changePassword, markNotificationsVues, getArchives,
     createUtilisateur, updateUtilisateur, resetPasswordUtilisateur, deleteUtilisateur,
     updateConfig,
     createAdherent, updateAdherent, deleteAdherent, archiveAdherent, unarchiveAdherent,
