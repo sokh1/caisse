@@ -569,6 +569,25 @@ function markNotificationsVues_(payload) {
 }
 
 /**
+ * Récupère l'onglet Archives à la demande — appelé uniquement à l'ouverture
+ * de la page Archives (voir js/app.js, showView()), plutôt que systématique-
+ * ment inclus dans chaque connexion/rafraîchissement (voir buildAppState_
+ * ci-dessous, optimisation 2). Toujours vide pour un compte "restreint"
+ * (Consultation avec la case cochée, ou Collecteur), exactement comme le
+ * reste de l'application — cette feuille n'est de toute façon jamais
+ * rattachée à un adhérent en particulier, donc jamais accessible à ces
+ * comptes-là.
+ */
+function getArchivesData_(payload) {
+  var user = requireAuth_(payload);
+  var restreint = (user.Role === ROLE_CONSULTATION && String(user.RestreintAAdherents || '') === '1') || user.Role === ROLE_COLLECTEUR;
+  if (restreint) return { headers: [], rows: [] };
+  var archivesSheet = getOrCreateArchivesSheet_();
+  var archivesHeaders = getArchivesHeaders_(archivesSheet);
+  return { headers: archivesHeaders, rows: archivesHeaders.length ? sheetToObjects_(archivesSheet, archivesHeaders) : [] };
+}
+
+/**
  * Calcule les notifications (nouvel adhérent / décès / dépense / cotisation
  * en attente de validation) des derniers jours (durée réglable depuis
  * Configuration). Un compte "restreint" (Consultation avec la case cochée,
@@ -654,6 +673,84 @@ function filterForUser_(user, adherents, cotisations, deces, depenses, documents
 /* Entrées HTTP                                                           */
 /* ---------------------------------------------------------------------- */
 
+/**
+ * Construit l'état complet de l'application pour un utilisateur donné
+ * (adhérents/cotisations/décès/dépenses/documents/archives/notifications/
+ * config/utilisateurs, déjà filtrés selon son rôle). Fonction centrale
+ * partagée par doGet ET par doPost (voir plus bas) : chaque action
+ * d'écriture renvoie désormais directement l'état à jour dans la même
+ * réponse HTTP, ce qui évite au client de refaire un second aller-retour
+ * (un appel réseau + une exécution Apps Script complète) juste pour
+ * rafraîchir l'affichage après une connexion ou une modification — c'est
+ * cet aller-retour redondant qui était la principale cause de lenteur
+ * perçue (voir note de performance ci-dessous).
+ *
+ * Optimisation 1 : pour un compte "restreint" (Consultation avec la case
+ * cochée, ou Collecteur, toujours restreint), les feuilles Décès/Dépenses/
+ * Documents ne sont même pas lues — filterForUser_ les aurait de toute
+ * façon renvoyées vides à ce type de compte (voir plus haut). Cela réduit
+ * nettement le nombre de lectures de feuille (donc la latence) pour un
+ * compte Collecteur, qui n'en a de toute façon jamais besoin.
+ *
+ * Optimisation 2 (Archives) : l'onglet Archives — souvent le plus volumineux
+ * de la feuille de calcul, car géré manuellement par l'utilisateur au fil du
+ * temps — n'est PLUS lu à chaque connexion/modification, pour QUELQUE rôle
+ * que ce soit (y compris Administrateur), alors qu'il n'était consulté que
+ * de temps en temps via la page "Archives". `opts.includeArchives` (faux
+ * par défaut) contrôle explicitement s'il faut le lire cette fois-ci ;
+ * `archives` vaut alors `null` dans l'état renvoyé, ce qui signale au
+ * client (voir js/app.js, loadAll()) de conserver la dernière copie qu'il a
+ * déjà en mémoire plutôt que d'effacer l'affichage. La page Archives
+ * demande elle-même une copie fraîche à son ouverture via une action dédiée
+ * et légère, `getArchives` (voir getArchivesData_ plus bas), qui ne relit
+ * que cette seule feuille — sans reconstruire tout le reste de l'état.
+ */
+function buildAppState_(user, opts) {
+  var includeArchives = !!(opts && opts.includeArchives);
+  var restreint = (user.Role === ROLE_CONSULTATION && String(user.RestreintAAdherents || '') === '1') || user.Role === ROLE_COLLECTEUR;
+
+  var adherentsSheet = getOrCreateSheet_(SHEET_ADHERENTS, ADHERENTS_HEADERS);
+  var cotisationsSheet = getOrCreateSheet_(SHEET_COTISATIONS, COTISATIONS_HEADERS);
+  var adherents = sheetToObjects_(adherentsSheet, ADHERENTS_HEADERS);
+  var cotisations = sheetToObjects_(cotisationsSheet, COTISATIONS_HEADERS);
+
+  var deces = [], depenses = [], documents = [];
+  var archives = null; // null = "non rechargé cette fois-ci" : voir js/app.js, loadAll().
+  if (!restreint) {
+    var decesSheet = getOrCreateSheet_(SHEET_DECES, DECES_HEADERS);
+    var depensesSheet = getOrCreateSheet_(SHEET_DEPENSES, DEPENSES_HEADERS);
+    var documentsSheet = getOrCreateSheet_(SHEET_DOCUMENTS, DOCUMENTS_HEADERS);
+    deces = sheetToObjects_(decesSheet, DECES_HEADERS);
+    depenses = sheetToObjects_(depensesSheet, DEPENSES_HEADERS);
+    documents = sheetToObjects_(documentsSheet, DOCUMENTS_HEADERS);
+    if (includeArchives) {
+      var archivesSheet = getOrCreateArchivesSheet_();
+      var archivesHeaders = getArchivesHeaders_(archivesSheet);
+      archives = { headers: archivesHeaders, rows: archivesHeaders.length ? sheetToObjects_(archivesSheet, archivesHeaders) : [] };
+    }
+  }
+
+  var notifications = computeNotifications_(user, adherents, cotisations, deces, depenses);
+  var filtered = filterForUser_(user, adherents, cotisations, deces, depenses, documents, archives);
+
+  var state = {
+    moi: userToPublic_(user),
+    adherents: filtered.adherents,
+    cotisations: filtered.cotisations,
+    deces: filtered.deces,
+    depenses: filtered.depenses,
+    documents: filtered.documents,
+    archives: filtered.archives,
+    notifications: notifications,
+    config: { dureeNotificationsJours: parseInt(getConfigValue_('DureeNotificationsJours', DEFAULT_NOTIF_DUREE_JOURS), 10) || DEFAULT_NOTIF_DUREE_JOURS }
+  };
+  if (user.Role === ROLE_ADMIN) {
+    state.utilisateurs = getAllUsers_().map(userToPublic_);
+    state.config.dossierDriveUrl = getConfigValue_('DossierDriveUrl', '');
+  }
+  return state;
+}
+
 function doGet(e) {
   try {
     var token = e && e.parameter ? e.parameter.token : '';
@@ -662,42 +759,9 @@ function doGet(e) {
     if (!user) {
       return jsonResponse_({ success: false, error: 'Authentification requise.', authRequired: true });
     }
-
-    var adherentsSheet = getOrCreateSheet_(SHEET_ADHERENTS, ADHERENTS_HEADERS);
-    var cotisationsSheet = getOrCreateSheet_(SHEET_COTISATIONS, COTISATIONS_HEADERS);
-    var decesSheet = getOrCreateSheet_(SHEET_DECES, DECES_HEADERS);
-    var depensesSheet = getOrCreateSheet_(SHEET_DEPENSES, DEPENSES_HEADERS);
-    var documentsSheet = getOrCreateSheet_(SHEET_DOCUMENTS, DOCUMENTS_HEADERS);
-    var archivesSheet = getOrCreateArchivesSheet_();
-
-    var adherents = sheetToObjects_(adherentsSheet, ADHERENTS_HEADERS);
-    var cotisations = sheetToObjects_(cotisationsSheet, COTISATIONS_HEADERS);
-    var deces = sheetToObjects_(decesSheet, DECES_HEADERS);
-    var depenses = sheetToObjects_(depensesSheet, DEPENSES_HEADERS);
-    var documents = sheetToObjects_(documentsSheet, DOCUMENTS_HEADERS);
-    var archivesHeaders = getArchivesHeaders_(archivesSheet);
-    var archives = { headers: archivesHeaders, rows: archivesHeaders.length ? sheetToObjects_(archivesSheet, archivesHeaders) : [] };
-
-    var notifications = computeNotifications_(user, adherents, cotisations, deces, depenses);
-    var filtered = filterForUser_(user, adherents, cotisations, deces, depenses, documents, archives);
-
-    var response = {
-      success: true,
-      moi: userToPublic_(user),
-      adherents: filtered.adherents,
-      cotisations: filtered.cotisations,
-      deces: filtered.deces,
-      depenses: filtered.depenses,
-      documents: filtered.documents,
-      archives: filtered.archives,
-      notifications: notifications,
-      config: { dureeNotificationsJours: parseInt(getConfigValue_('DureeNotificationsJours', DEFAULT_NOTIF_DUREE_JOURS), 10) || DEFAULT_NOTIF_DUREE_JOURS }
-    };
-    if (user.Role === ROLE_ADMIN) {
-      response.utilisateurs = getAllUsers_().map(userToPublic_);
-      response.config.dossierDriveUrl = getConfigValue_('DossierDriveUrl', '');
-    }
-    return jsonResponse_(response);
+    var state = buildAppState_(user);
+    state.success = true;
+    return jsonResponse_(state);
   } catch (err) {
     return jsonResponse_({ success: false, error: String(err) });
   }
@@ -726,6 +790,9 @@ function doPost(e) {
         break;
       case 'markNotificationsVues':
         result = markNotificationsVues_(payload);
+        break;
+      case 'getArchives':
+        result = getArchivesData_(payload);
         break;
       case 'createUtilisateur':
         result = createUtilisateur_(payload);
@@ -800,7 +867,36 @@ function doPost(e) {
         return jsonResponse_({ success: false, error: 'Action inconnue: ' + action });
     }
 
-    return jsonResponse_({ success: true, data: result });
+    var response = { success: true, data: result };
+    // Note de performance : chaque appel à l'application web Apps Script paie
+    // un coût de latence fixe (démarrage/dispatch côté Google), indépendant
+    // de ce que fait la fonction elle-même. Avant cette optimisation, le
+    // client faisait systématiquement un aller-retour supplémentaire (doGet)
+    // juste après une connexion ou une modification pour rafraîchir
+    // l'affichage — payant ce coût fixe deux fois pour une seule action
+    // utilisateur (source des lenteurs ressenties à la connexion, après une
+    // modification, après une validation de cotisation…). On renvoie donc
+    // directement l'état à jour dans la même réponse, ce qui permet au
+    // client de s'en servir sans refaire de second appel (voir js/api.js,
+    // remotePost/getAll). Exception : après "logout", la session vient
+    // d'être supprimée, il n'y a plus rien à recalculer pour cet utilisateur.
+    // 'logout' : plus de session à recalculer. 'markNotificationsVues' :
+    // action fréquente (chaque ouverture de la cloche 🔔) et jamais suivie
+    // d'un rechargement côté client (app.js met déjà l'affichage à jour
+    // localement) — y calculer l'état complet serait donc un pur gaspillage,
+    // répété à chaque clic sur les notifications. 'getArchives' : action de
+    // LECTURE ciblée (voir getArchivesData_) déclenchée à l'ouverture de la
+    // page Archives — reconstruire tout l'état par-dessus serait à la fois
+    // inutile (rien d'autre n'a changé) et contre-productif (cela annulerait
+    // l'intérêt de ne lire que cette seule feuille, sur demande).
+    if (action !== 'logout' && action !== 'markNotificationsVues' && action !== 'getArchives') {
+      var stateToken = (action === 'login' && result && result.token) ? result.token : payload.token;
+      var actingUser = getSessionUser_(stateToken);
+      if (actingUser) {
+        response.state = buildAppState_(actingUser);
+      }
+    }
+    return jsonResponse_(response);
   } catch (err) {
     return jsonResponse_({ success: false, error: String(err), authRequired: !!(err && err.authRequired) });
   }
